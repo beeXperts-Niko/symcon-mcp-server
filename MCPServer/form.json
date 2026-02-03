@@ -1,6 +1,10 @@
 {
   "elements": [
     {
+      "type": "Label",
+      "caption": "PortBeschreibung"
+    },
+    {
       "type": "NumberSpinner",
       "name": "Port",
       "caption": "Port",
@@ -8,9 +12,17 @@
       "maximum": 65535
     },
     {
+      "type": "Label",
+      "caption": "SymconApiUrlBeschreibung"
+    },
+    {
       "type": "ValidationTextBox",
       "name": "SymconApiUrl",
       "caption": "SymconApiUrl"
+    },
+    {
+      "type": "Label",
+      "caption": "ActiveBeschreibung"
     },
     {
       "type": "CheckBox",
