@@ -1,0 +1,48 @@
+{
+  "elements": [
+    {
+      "type": "RowLayout",
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Port"
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "Port",
+          "caption": "Port",
+          "minimum": 1024,
+          "maximum": 65535
+        }
+      ]
+    },
+    {
+      "type": "RowLayout",
+      "items": [
+        {
+          "type": "Label",
+          "caption": "SymconApiUrl"
+        },
+        {
+          "type": "TextBox",
+          "name": "SymconApiUrl",
+          "caption": "SymconApiUrl"
+        }
+      ]
+    },
+    {
+      "type": "RowLayout",
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Active"
+        },
+        {
+          "type": "CheckBox",
+          "name": "Active",
+          "caption": "Active"
+        }
+      ]
+    }
+  ]
+}

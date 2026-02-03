@@ -1,0 +1,12 @@
+{
+  "id": "{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}",
+  "author": "Niko Sinthern",
+  "name": "Symcon MCP Server",
+  "url": "https://www.symcon.de/",
+  "compatibility": {
+    "version": "5.0"
+  },
+  "version": "1.0",
+  "build": 1,
+  "date": 1738540800
+}

@@ -1,0 +1,12 @@
+{
+  "id": "{B2C3D4E5-F6A7-5B6C-9D0E-1F2A3B4C5D6E}",
+  "name": "MCP Server",
+  "type": 4,
+  "vendor": "Symcon",
+  "aliases": ["MCP Server"],
+  "parentRequirements": [],
+  "childRequirements": [],
+  "implemented": [],
+  "prefix": "MCP",
+  "url": "https://www.symcon.de/de/service/dokumentation/befehlsreferenz/"
+}

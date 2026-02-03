@@ -1,0 +1,23 @@
+{
+  "name": "symcon-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server for IP-Symcon - exposes Symcon API as MCP tools",
+  "author": "Niko Sinthern",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}

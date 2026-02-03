@@ -1,0 +1,11 @@
+{
+  "MCP Server": {
+    "Port": "Port",
+    "SymconApiUrl": "Symcon API URL",
+    "Active": "Active",
+    "ProcessStarted": "MCP server started",
+    "ProcessStopped": "MCP server stopped",
+    "InvalidPort": "Invalid port",
+    "InvalidApiUrl": "Invalid API URL"
+  }
+}
