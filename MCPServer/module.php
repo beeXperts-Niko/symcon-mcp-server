@@ -75,17 +75,21 @@ class MCPServer extends IPSModule
 
     public function GetConfigurationForm(): string
     {
-        $form = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
+        $formPath = __DIR__ . '/form.json';
+        $form = is_file($formPath) ? json_decode((string) file_get_contents($formPath), true) : null;
         if (!is_array($form) || !isset($form['elements']) || !is_array($form['elements'])) {
-            return '[]';
+            return json_encode(['elements' => [['type' => 'Label', 'caption' => 'Konfiguration (form.json) nicht geladen.']]]);
+        }
+        if ($this->InstanceID <= 0) {
+            return json_encode($form);
         }
         $port = (int) $this->ReadPropertyInteger('Port');
         $status = $this->getProcessStatus();
         $statusCaption = $status['running']
-            ? sprintf('✓ MCP-Server läuft auf Port %d (PID: %s). Cursor verbindet sich zu http://<SymBox-IP>:%d', $port, $status['pid'], $port)
-            : '○ MCP-Server gestoppt. „Aktiv“ setzen und „Änderungen übernehmen“ klicken zum Starten.';
+            ? sprintf('[OK] MCP-Server läuft auf Port %d (PID: %s). Cursor: http://<SymBox-IP>:%d', $port, $status['pid'], $port)
+            : '[--] MCP-Server gestoppt. Aktiv setzen und Änderungen übernehmen klicken.';
         array_unshift($form['elements'], [
-            'type'  => 'Label',
+            'type'    => 'Label',
             'caption' => $statusCaption,
         ]);
         return json_encode($form);
