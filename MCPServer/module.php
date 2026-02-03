@@ -253,10 +253,10 @@ class MCPServer extends IPSModule
         }
     }
 
-    /** Schreibt ins Instanz-Debug-Protokoll (sendDebug der Elternklasse) und ins allgemeine Log. */
+    /** Schreibt ins Instanz-Debug-Protokoll (SendDebug der Elternklasse) und ins allgemeine Log. */
     private function mcpLog(string $message): void
     {
-        $this->sendDebug($message, '');
+        $this->SendDebug($message);
         IPS_LogMessage('MCPServer', $message);
     }
 }
