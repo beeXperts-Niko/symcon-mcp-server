@@ -60,6 +60,13 @@ class MCPServer extends IPSModule
         }
 
         if (!$active || $port < 1024 || $port > 65535 || $apiUrl === '') {
+            if (!$active) {
+                $this->sendDebug('MCP-Server deaktiviert („Aktiv“ aus). Nicht gestartet.');
+            } elseif ($port < 1024 || $port > 65535) {
+                $this->sendDebug('Ungültiger Port ' . $port . '. MCP-Server nicht gestartet.');
+            } else {
+                $this->sendDebug('Symcon-API-URL fehlt. MCP-Server nicht gestartet.');
+            }
             return;
         }
 
@@ -69,10 +76,41 @@ class MCPServer extends IPSModule
     public function GetConfigurationForm(): string
     {
         $form = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
-        if (!is_array($form)) {
+        if (!is_array($form) || !isset($form['elements']) || !is_array($form['elements'])) {
             return '[]';
         }
+        $port = (int) $this->ReadPropertyInteger('Port');
+        $status = $this->getProcessStatus();
+        $statusCaption = $status['running']
+            ? sprintf('✓ MCP-Server läuft auf Port %d (PID: %s). Cursor verbindet sich zu http://<SymBox-IP>:%d', $port, $status['pid'], $port)
+            : '○ MCP-Server gestoppt. „Aktiv“ setzen und „Änderungen übernehmen“ klicken zum Starten.';
+        array_unshift($form['elements'], [
+            'type'  => 'Label',
+            'caption' => $statusCaption,
+        ]);
         return json_encode($form);
+    }
+
+    /** Liefert ['running' => bool, 'pid' => string] für die Status-Anzeige. */
+    private function getProcessStatus(): array
+    {
+        $pidFile = $this->getPidFilePath();
+        if (!is_file($pidFile)) {
+            return ['running' => false, 'pid' => ''];
+        }
+        $pid = (int) trim((string) file_get_contents($pidFile));
+        if ($pid <= 0) {
+            return ['running' => false, 'pid' => ''];
+        }
+        $running = false;
+        if (function_exists('posix_kill')) {
+            $running = @posix_kill($pid, 0);
+        } else {
+            if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                $running = trim((string) @shell_exec('tasklist /FI "PID eq ' . $pid . '" 2>nul')) !== '';
+            }
+        }
+        return ['running' => $running, 'pid' => (string) $pid];
     }
 
     private function getMcpServerPath(): string
@@ -96,6 +134,7 @@ class MCPServer extends IPSModule
             @unlink($pidFile);
             return;
         }
+        $this->sendDebug('MCP-Server wird beendet (PID ' . $pid . ').');
         if (function_exists('posix_kill')) {
             @posix_kill($pid, (defined('SIGTERM') ? SIGTERM : 15));
         } else {
@@ -106,6 +145,7 @@ class MCPServer extends IPSModule
             }
         }
         @unlink($pidFile);
+        $this->sendDebug('MCP-Server gestoppt.');
     }
 
     private function startProcess(int $port, string $apiUrl, string $apiKey = ''): void
@@ -116,7 +156,7 @@ class MCPServer extends IPSModule
             $nodePath = $mcpPath . '/index.js';
         }
         if (!is_file($nodePath)) {
-            IPS_LogMessage('MCPServer', 'Node entry not found: ' . $nodePath);
+            $this->sendDebug('FEHLER: Node-Einstieg nicht gefunden: ' . $nodePath);
             return;
         }
 
@@ -157,7 +197,7 @@ class MCPServer extends IPSModule
             $procEnv
         );
         if (!is_resource($proc)) {
-            IPS_LogMessage('MCPServer', 'Failed to start MCP server process');
+            $this->sendDebug('FEHLER: MCP-Server-Prozess konnte nicht gestartet werden.');
             return;
         }
         fclose($pipes[0]);
@@ -169,6 +209,15 @@ class MCPServer extends IPSModule
         $pid = (int) trim((string) $stdout);
         if ($pid > 0) {
             file_put_contents($pidFile, (string) $pid);
+            $this->sendDebug(sprintf('MCP-Server gestartet: Port %d, PID %d, Symcon-API %s, Auth %s', $port, $pid, $apiUrl, $apiKey !== '' ? 'aktiv' : 'aus'));
+        } else {
+            $this->sendDebug('FEHLER: Keine PID nach Start erhalten.');
         }
+    }
+
+    /** Schreibt ins Debug-Protokoll der Instanz (und ins allgemeine Log). */
+    private function sendDebug(string $message): void
+    {
+        IPS_LogMessage((string) $this->InstanceID, $message);
     }
 }
