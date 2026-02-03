@@ -253,10 +253,9 @@ class MCPServer extends IPSModule
         }
     }
 
-    /** Schreibt ins Instanz-Debug-Protokoll (SendDebug der Elternklasse) und ins allgemeine Log. */
+    /** Schreibt ins Log (Meldungen/Nachrichten, Absender MCPServer). SendDebug-Signatur ist Symcon-versionabhängig. */
     private function mcpLog(string $message): void
     {
-        $this->SendDebug($message);
         IPS_LogMessage('MCPServer', $message);
     }
 }
