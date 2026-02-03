@@ -24,7 +24,7 @@
           "caption": "SymconApiUrl"
         },
         {
-          "type": "TextBox",
+          "type": "ValidationTextBox",
           "name": "SymconApiUrl",
           "caption": "SymconApiUrl"
         }

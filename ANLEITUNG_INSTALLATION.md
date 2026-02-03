@@ -1,190 +1,219 @@
-# Anleitung: MCP-Server-Modul zum Laufen bringen
+# Anleitung: MCP-Server-Modul auf der SymBox (SymOS) zum Laufen bringen
 
-Diese Anleitung richtet sich an Nutzer mit **nur Web-Oberfläche** (z. B. `http://192.168.10.12:3777/console/`) und wenig Erfahrung mit Symcon-Modulentwicklung.
+Diese Anleitung ist für **SymBox mit SymOS** geschrieben. Sie nutzen nur die Weboberfläche (z. B. `http://192.168.10.12:3777/console/`) und haben wenig Erfahrung mit Symcon-Modulentwicklung.
+
+---
+
+## Build ist fertig – was jetzt?
+
+Wenn Sie den MCP-Server **lokal auf dem Mac gebaut** haben, sind das die nächsten Schritte:
+
+| # | Was | Wo / Wie |
+|---|-----|----------|
+| 1 | **Modul auf die SymBox bringen** | Entweder: Repo auf GitHub pushen → in Symcon **Module Control** die Repo-URL eintragen. Oder: Ordner `symcon-mcp-server` (mit allem außer `node_modules`) per SMB/SFTP nach `/var/lib/symcon/user/symcon-mcp-server/` auf die SymBox kopieren. |
+| 2 | **`dist/` auf die SymBox kopieren** | Den bei Ihnen gebauten Ordner **`libs/mcp-server/dist/`** (vom Mac) in dasselbe Verzeichnis auf der SymBox legen: `/var/lib/symcon/user/symcon-mcp-server/libs/mcp-server/dist/` (z. B. per SMB/SFTP). Darin muss `index.js` liegen. |
+| 3 | **Node.js auf der SymBox** | Das Modul startet `node dist/index.js`. Auf der SymBox muss **Node.js** (v20+) installiert und als `node` erreichbar sein. Ohne Node startet der MCP-Server nicht. Ob/wie Node auf SymBox installierbar ist, steht in der [SymBox-Anleitung](https://www.symcon.de/assets/files/product/symbox.pdf) bzw. beim Support. |
+| 4 | **Modul in Symcon einbinden** | Konsole öffnen → **Kern Instanzen** → **Modules** → bei Git: **+** und Repo-URL eintragen. Bei manuell kopiert: Konsole neu laden oder Symcon-Dienst neustarten, damit die Bibliothek erscheint. |
+| 5 | **Instanz anlegen** | **Instanz hinzufügen** → **MCP Server** wählen → Konfiguration: **Port** (z. B. 4096), **Symcon API URL** `http://127.0.0.1:3777/api/`, **Aktiv** anhaken → **Änderungen übernehmen**. |
+
+Danach läuft der MCP-Server auf der SymBox (wenn Node vorhanden ist). Details zu jedem Schritt stehen in den folgenden Abschnitten.
+
+---
+
+## SymBox & SymOS – kurz
+
+- **SymBox** = Komplettlösung für IP-Symcon (Hardware + SymOS).
+- **SymOS** = von Symcon bereitgestelltes Betriebssystem (Linux-basiert), mit Weboberfläche für Einstellungen, Backup, Updates.
+- Benutzer-Module liegen auf der SymBox unter: **`/var/lib/symcon/user/`**
+- Sie steuern alles über die **IP-Symcon-Verwaltungskonsole** (Browser); für manche Schritte brauchen Sie ggf. **SSH** oder **Dateizugriff** (SMB/SFTP), falls auf Ihrer SymBox verfügbar.
+
+Weitere Infos: [SymBox-Dokumentation](https://www.symcon.de/de/service/dokumentation/installation/symbox), [Installationsanleitung PDF](https://www.symcon.de/assets/files/product/symbox.pdf).
 
 ---
 
 ## Übersicht: Was Sie brauchen
 
-1. **Symcon-Weboberfläche** – haben Sie bereits (z. B. `http://192.168.10.12:3777/console/`).
-2. **Den Modul-Code auf dem Symcon-Server** – entweder per **Git-Repository** (empfohlen) oder per **manuelles Kopieren**.
-3. **Node.js auf dem Symcon-Server** – damit der MCP-Server (Node) starten kann.
+1. **Symcon-Weboberfläche** – haben Sie (z. B. `http://<IP-der-SymBox>:3777/console/`).
+2. **Modul-Code auf der SymBox** – per **Git-Repository** in der Module Control (empfohlen) oder per **manuelles Kopieren** in den user-Ordner.
+3. **Laufbaren MCP-Server (Node)** – auf der SymBox. Da SymOS in der Regel **kein Node.js** mitbringt, bauen Sie `dist/` auf Ihrem **PC** und kopieren es in `libs/mcp-server/` auf die SymBox (siehe Schritt 4).
 4. **Eine Instanz „MCP Server“** in Symcon – anlegen und konfigurieren.
 
 ---
 
-## Schritt 1: Node.js auf dem Symcon-Server
+## Schritt 1: Node.js – nur auf Ihrem PC nötig (für SymBox ohne Node)
 
-Der MCP-Server ist ein kleines Node.js-Programm. Es muss auf **demselben Rechner** laufen wie Symcon (bei Ihnen vermutlich der Rechner mit der IP 192.168.10.12).
+Der MCP-Server ist ein Node.js-Programm. Auf der **SymBox** ist Node.js meist **nicht** vorinstalliert und wird von SymOS nicht mitgeliefert.
 
-- **Wenn Sie per SSH auf den Server können:**  
-  Einloggen, dann prüfen: `node --version` (sollte v20 oder höher sein).  
-  Falls nicht installiert: Node.js LTS von [nodejs.org](https://nodejs.org/) installieren (unter Linux z. B. per Paketmanager oder nvm).
+- **Empfohlener Weg für SymBox:**  
+  Sie bauen den MCP-Server **auf Ihrem eigenen Rechner** (Windows/macOS/Linux) mit Node.js (v20+) und kopieren nur den fertigen Ordner **`dist/`** in `libs/mcp-server/` auf die SymBox. Dann muss auf der SymBox **kein** Node installiert werden – das Modul startet die **`node`-Binary**, die Sie ggf. separat bereitstellen müssten.  
 
-- **Wenn Sie keinen SSH-Zugang haben:**  
-  Prüfen Sie in der Symcon-Dokumentation oder beim Hersteller Ihres Geräts (NAS, SymBox, Raspberry, PC), ob Node.js vorinstalliert ist oder wie es installiert wird. Ohne Node.js auf dem Server kann das Modul den MCP-Server-Prozess nicht starten.
+  **Hinweis:** Das Modul startet aktuell `node dist/index.js`. Wenn auf der SymBox kein `node` existiert, müssen Sie entweder Node auf der SymBox installieren (nur mit SSH/Zugang zur Shell möglich) oder den Ansatz „vorkompiliertes dist/ kopieren“ nutzen und sicherstellen, dass auf der SymBox eine Node-Laufzeit vorhanden ist. Da SymBox/SymOS typischerweise **kein** Node mitliefert, gilt für die meisten Nutzer: **Zuerst Schritt 4 auf dem PC ausführen (Build), dann `dist/` auf die SymBox kopieren.** Ob auf Ihrer SymBox Node installiert werden kann, steht in der [SymBox-Installationsanleitung](https://www.symcon.de/assets/files/product/symbox.pdf) bzw. beim Support.
+
+- **Wenn Sie SSH-Zugang zur SymBox haben** und Node dort installieren können:  
+  Nach dem Einloggen `node --version` prüfen (v20 oder höher). Falls Node fehlt, nach Anleitung für Ihr SymOS/Linux Node.js LTS installieren (Paketmanager oder nvm). Dann können Sie Schritt 4 direkt auf der SymBox ausführen (`npm install` und `npm run build` in `libs/mcp-server/`).
 
 ---
 
-## Schritt 2: Modul-Code auf den Symcon-Server bringen
+## Schritt 2: Modul-Code auf die SymBox bringen
 
-Symcon liest Module aus einem festen Ordner („user“). Sie haben zwei Wege:
+Symcon liest Benutzer-Module auf der **SymBox** aus dem Ordner **`/var/lib/symcon/user/`**.
 
-### Option A: Installation über ein Git-Repository (empfohlen)
+### Option A: Installation über Git-Repository (empfohlen)
 
-So kann Symcon das Modul selbst herunterladen und später aktualisieren.
+So lädt Symcon die Bibliothek selbst herunter und Sie können sie später aktualisieren.
 
-1. **GitHub-Account** (falls noch keiner: [github.com](https://github.com) → Sign up).
+1. **GitHub-Account** anlegen (falls noch keiner: [github.com](https://github.com) → Sign up).
 
-2. **Neues Repository anlegen**  
-   - Auf GitHub: „New repository“.  
-   - Name z. B. `symcon-mcp-server`.  
-   - Öffentlich (Public), ohne README/ .gitignore (Projekt ist schon da).
+2. **Neues Repository anlegen**
+   - Auf GitHub: „New repository“.
+   - Name z. B. `symcon-mcp-server`.
+   - Öffentlich (Public), ohne README / .gitignore.
 
-3. **Nur den Inhalt von `symcon-mcp-server` als Repo-Inhalt verwenden**  
-   Der **Root** des Repositories muss genau so aussehen:
+3. **Inhalt des Repositories = Inhalt von `symcon-mcp-server`**  
+   Im Root des Repos müssen liegen:
    - `library.json`
    - Ordner `MCPServer/`
    - Ordner `libs/`
    - optional: `README.md`, `ANLEITUNG_INSTALLATION.md`
 
-   Auf Ihrem Rechner (im Projektordner):
+   Auf Ihrem Rechner:
    - In den Ordner wechseln: `symconMCP/symcon-mcp-server`
    - Git initialisieren (falls noch nicht):  
      `git init`  
      `git add library.json MCPServer libs README.md ANLEITUNG_INSTALLATION.md`  
      `git commit -m "Symcon MCP Server Modul"`
-   - Remote hinzufügen (Ihre GitHub-URL eintragen):  
+   - Remote setzen (Ihre GitHub-URL eintragen):  
      `git remote add origin https://github.com/IHR-BENUTZERNAME/symcon-mcp-server.git`  
      `git branch -M main`  
      `git push -u origin main`
 
 4. **Repository-URL für Symcon kopieren**  
-   - HTTPS-URL der Repo-Startseite, z. B.:  
-     `https://github.com/IHR-BENUTZERNAME/symcon-mcp-server`
+   z. B. `https://github.com/IHR-BENUTZERNAME/symcon-mcp-server`
 
 ---
 
-### Option B: Manuelles Kopieren (wenn Sie Zugriff auf die Festplatte des Servers haben)
+### Option B: Manuelles Kopieren auf die SymBox
 
-Symcon speichert Benutzer-Module typischerweise hier:
+Wenn Sie Zugriff auf das Dateisystem der SymBox haben (z. B. SMB-Freigabe, SFTP, USB-Stick-Restore):
 
-- **Windows:** `C:\ProgramData\Symcon\user\`
-- **Linux / Raspberry / SymBox:** `/var/lib/symcon/user/`
+1. Den **kompletten** Ordner **symcon-mcp-server** (mit `library.json`, `MCPServer/`, `libs/`, …) auf die SymBox kopieren.
+2. In den **user**-Ordner legen:
+   - **SymBox (SymOS, Linux):**  
+     **`/var/lib/symcon/user/symcon-mcp-server/`**
 
-1. Den kompletten Ordner **symcon-mcp-server** (mit allem darin: `library.json`, `MCPServer/`, `libs/`, …) auf den Server kopieren.
-2. In den **user**-Ordner legen, z. B. als:
-   - `C:\ProgramData\Symcon\user\symcon-mcp-server\` (Windows) oder
-   - `/var/lib/symcon/user/symcon-mcp-server/` (Linux).
-
-Kopieren per SMB/Freigabe, SFTP, USB-Stick o. Ä. – je nachdem, wie Sie auf den Server zugreifen.
+Zugriff auf `/var/lib/symcon/` ist je nach SymBox über SMB-Freigabe, SFTP oder andere in der [SymBox-Dokumentation](https://www.symcon.de/de/service/dokumentation/installation/symbox) beschriebene Wege möglich.
 
 ---
 
 ## Schritt 3: Modul in der Symcon-Weboberfläche einbinden
 
 1. In der **Verwaltungskonsole** einloggen:  
-   `http://192.168.10.12:3777/console/`
+   `http://<IP-der-SymBox>:3777/console/`  
+   (z. B. `http://192.168.10.12:3777/console/`)
 
 2. **Module Control** öffnen:
-   - Links in der Baumansicht: **„Kern Instanzen“** (oder „Kern-Instanzen“) aufklappen.
+   - Links: **„Kern Instanzen“** aufklappen.
    - Instanz **„Modules“** (Module Control) auswählen.
 
 3. **Repository hinzufügen** (nur bei Option A):
-   - Auf das **„+“** (Plus) klicken oder den Bereich „Repository hinzufügen“ nutzen.
-   - Die **Repository-URL** eintragen, z. B.:  
+   - Auf **„+“** (Plus) klicken bzw. „Repository hinzufügen“ nutzen.
+   - **Repository-URL** eintragen, z. B.:  
      `https://github.com/IHR-BENUTZERNAME/symcon-mcp-server`
-   - Bestätigen. Symcon lädt die Bibliothek herunter und zeigt sie in der Liste an.
+   - Bestätigen. Symcon lädt die Bibliothek herunter; sie erscheint in der Liste. Auf der SymBox landet sie unter `/var/lib/symcon/user/<repo-name>/`.
 
 4. **Bei Option B (manuell kopiert):**
-   - Symcon erkennt neue Bibliotheken im `user`-Ordner oft nach einem **Neustart des Symcon-Dienstes** oder einem Reload der Konsole.
-   - Falls die Bibliothek nicht erscheint: Symcon-Dokumentation zu „lokale Module / user-Ordner“ für Ihre Version prüfen.
+   - Symcon erkennt neue Bibliotheken im `user`-Ordner oft erst nach einem **Neustart des Symcon-Dienstes** oder nach Reload der Konsole (Seite neu laden). Bei SymBox ggf. in den Einstellungen prüfen, ob ein Neustart nötig ist.
 
 ---
 
-## Schritt 4: Node-Abhängigkeiten bauen (einmalig)
+## Schritt 4: MCP-Server bauen – auf dem PC, dann `dist/` auf die SymBox kopieren
 
-Der MCP-Server ist in TypeScript geschrieben und muss einmal gebaut werden.
+Da auf der SymBox in der Regel **kein Node.js** installiert ist, bauen Sie den MCP-Server auf Ihrem **eigenen Rechner** und kopieren nur das Ergebnis auf die SymBox.
 
-**Dafür brauchen Sie Zugriff auf eine Kommandozeile auf dem Symcon-Server** (SSH, direkte Konsole, oder z. B. „Task“/„Skript“ auf dem Gerät).
+1. **Auf Ihrem PC** (Windows/macOS/Linux, mit installiertem Node.js v20+):
+   - In den Ordner wechseln:  
+     `symconMCP/symcon-mcp-server/libs/mcp-server`
+   - Ausführen:
+     ```bash
+     npm install
+     npm run build
+     ```
+   - Es entsteht der Ordner **`dist/`** mit `index.js` darin.
 
-1. Auf dem Server in den MCP-Server-Ordner wechseln. Typische Pfade:
-   - **Option A (Git):**  
-     z. B. `/var/lib/symcon/user/symcon-mcp-server/libs/mcp-server` (Linux)  
-     oder `C:\ProgramData\Symcon\user\symcon-mcp-server\libs\mcp-server` (Windows).
-   - **Option B (manuell):**  
-     Derselbe Pfad, je nachdem wo Sie `symcon-mcp-server` abgelegt haben.
+2. **Ordner `dist/` auf die SymBox kopieren:**
+   - Zielpfad auf der SymBox:  
+     **`/var/lib/symcon/user/symcon-mcp-server/libs/mcp-server/dist/`**
+   - Also: Inhalt von `dist/` (mindestens `index.js`) so auf die SymBox legen, dass z. B.  
+     `/var/lib/symcon/user/symcon-mcp-server/libs/mcp-server/dist/index.js`  
+     existiert.
+   - Kopieren per SMB-Freigabe, SFTP oder anderem Zugriff, den Ihre SymBox anbietet.
 
-2. Dort ausführen:
-   ```bash
-   npm install
-   npm run build
-   ```
-   Danach sollte der Ordner `dist/` mit `index.js` existieren.
-
-Wenn Sie **keinen** Shell-Zugriff haben: Manche Symcon-Umgebungen (z. B. NAS) erlauben, dass Sie den **bereits gebauten** Ordner `dist/` von Ihrem Entwicklungsrechner mit in den Ordner `libs/mcp-server/` kopieren (also `npm run build` lokal ausführen und dann `dist/` auf den Server kopieren). Dann entfällt `npm run build` auf dem Server.
+**Falls Sie SSH und Node.js auf der SymBox haben:**  
+Auf der SymBox in `/var/lib/symcon/user/symcon-mcp-server/libs/mcp-server/` die Befehle `npm install` und `npm run build` ausführen – dann entsteht `dist/` direkt auf der SymBox.
 
 ---
 
 ## Schritt 5: Instanz „MCP Server“ anlegen und konfigurieren
 
 1. In der **Verwaltungskonsole**:
-   - Oben oder im Kontextmenü: **„Instanz hinzufügen“** (oder „Gerät/Modul hinzufügen“).
+   - **„Instanz hinzufügen“** (oder „Gerät/Modul hinzufügen“) wählen.
 
-2. In der Liste nach **„MCP Server“** suchen (unter der Bibliothek „Symcon MCP Server“).
-   - **MCP Server** auswählen und bestätigen (z. B. „Hinzufügen“ / „OK“).
+2. In der Liste nach **„MCP Server“** suchen (Bibliothek „Symcon MCP Server“).
+   - **MCP Server** auswählen und bestätigen.
 
-3. Die neue Instanz auswählen und die **Konfiguration** öffnen.
+3. Neue Instanz auswählen und **Konfiguration** öffnen.
 
-4. **Einstellungen setzen:**
-   - **Port:** z. B. `4096` (freier TCP-Port auf dem Server).
+4. **Einstellungen:**
+   - **Port:** z. B. `4096` (freier Port auf der SymBox).
    - **Symcon API URL:**  
      `http://127.0.0.1:3777/api/`  
-     (läuft auf demselben Rechner wie Symcon; Port 3777 ist der Standard-Webserver.)
+     (Symcon läuft auf derselben SymBox; 3777 = Standard-Webserver.)
    - **Aktiv:** Haken setzen.
 
-5. **„Änderungen übernehmen“** (oder „Apply“ / „Speichern“) klicken.
+5. **„Änderungen übernehmen“** klicken.
 
-Symcon startet dann im Hintergrund den Node-Prozess (MCP-Server). Wenn Node.js nicht installiert ist oder `dist/index.js` fehlt, passiert nichts oder es erscheint ggf. eine Meldung im Log.
+Symcon startet dann den Node-Prozess (MCP-Server). **Wichtig:** Auf der SymBox muss dafür **Node.js** installiert und im Pfad erreichbar sein (`node`-Befehl). Wenn Ihre SymBox kein Node mitliefert und Sie keinen SSH-Zugang haben, kann das Modul den Prozess nicht starten – in dem Fall müssten Sie Node nach Symcon/SymBox-Dokumentation oder mit Support nachinstallieren.
 
 ---
 
 ## Schritt 6: Prüfen, ob der MCP-Server läuft
 
-- **Von einem Rechner im gleichen Netzwerk** (z. B. Ihr PC):
-  - Im Browser oder mit einem Tool:  
-    `http://192.168.10.12:4096`  
-    (4096 durch Ihren konfigurierten Port ersetzen.)
-  - Es kann eine leere Seite oder eine technische Antwort kommen – wichtig ist, dass nicht „Verbindung abgelehnt“ kommt. Dann lauscht der MCP-Server.
+- **MCP-Server bindet nur an 127.0.0.1 (localhost).**  
+  Ein Aufruf von außen (z. B. `http://192.168.10.12:4096`) geht nur, wenn Sie den MCP-Server so anpassen, dass er auf alle Schnittstellen (0.0.0.0) hört, oder Sie einen Tunnel nutzen.
 
-- **Hinweis:** Der MCP-Server bindet sich nur an **127.0.0.1** (localhost). Wenn Sie von außen (z. B. 192.168.10.12:4096) zugreifen wollen, müsste die Bindung in der Modul-/Server-Konfiguration angepasst werden (Thema „Listen on all interfaces“). Standard ist nur localhost.
+- **Prüfung von Ihrem PC aus (z. B. mit SSH-Tunnel):**
+  ```bash
+  ssh -L 4096:127.0.0.1:4096 BENUTZER@<IP-der-SymBox>
+  ```
+  Dann im Browser oder MCP-Client: `http://127.0.0.1:4096` (Verbindung läuft über den Tunnel zur SymBox).
 
-- **Logs:** In Symcon unter **„Log“** oder **„Nachrichten“** nach Einträgen zu „MCPServer“ oder „MCP“ schauen (Fehler beim Start des Node-Prozesses erscheinen dort, wenn Symcon das schreibt).
+- **Logs:** In Symcon unter **„Log“** / **„Nachrichten“** nach Einträgen zu „MCPServer“ oder „MCP“ schauen – Fehler beim Start des Node-Prozesses erscheinen dort, wenn Symcon sie schreibt.
 
 ---
 
-## Kurz-Checkliste
+## Kurz-Checkliste (SymBox/SymOS)
 
 | Schritt | Erledigt? |
 |--------|-----------|
-| Node.js (v20+) auf dem Symcon-Server (192.168.10.12) | ☐ |
-| Modul-Code auf Server (Git-Repo in Module Control ODER manuell in `user/`) | ☐ |
-| `npm install` und `npm run build` in `libs/mcp-server/` auf dem Server (oder `dist/` kopiert) | ☐ |
+| Modul-Code auf SymBox (Git in Module Control ODER kopiert nach `/var/lib/symcon/user/symcon-mcp-server/`) | ☐ |
+| Auf dem PC: `npm install` und `npm run build` in `libs/mcp-server/` ausgeführt | ☐ |
+| Ordner `dist/` nach `/var/lib/symcon/user/symcon-mcp-server/libs/mcp-server/` auf die SymBox kopiert | ☐ |
+| Node.js auf der SymBox verfügbar (oder geklärt, dass Modul sonst nicht starten kann) | ☐ |
 | In der Konsole: Instanz „MCP Server“ angelegt | ☐ |
 | Port (z. B. 4096), Symcon API URL `http://127.0.0.1:3777/api/`, „Aktiv“ gesetzt | ☐ |
 | „Änderungen übernehmen“ geklickt | ☐ |
 
 ---
 
-## Typische Probleme
+## Typische Probleme (SymBox)
 
 - **„Modul erscheint nicht unter Instanz hinzufügen“**  
-  Repository-URL prüfen (Option A) oder Pfad im `user`-Ordner und ggf. Symcon-Neustart (Option B).
+  Repository-URL prüfen (Option A) oder prüfen, ob der Ordner wirklich unter `/var/lib/symcon/user/symcon-mcp-server/` liegt (Option B). Konsole neu laden oder Symcon-Dienst neustarten.
 
 - **„MCP-Server startet nicht“**  
-  Node.js auf dem Server installiert? In `libs/mcp-server` `npm run build` ausgeführt (oder `dist/` von Ihrem Rechner kopiert)?
+  Auf der SymBox muss `node` lauffähig sein. Wenn Node nicht installiert ist: entweder Node nach SymBox-Dokumentation installieren (SSH nötig) oder beim Symcon-Support nachfragen. Außerdem: `dist/index.js` muss unter `libs/mcp-server/dist/` auf der SymBox existieren (Schritt 4).
 
 - **„Verbindung zu Port 4096 schlägt fehl“**  
-  MCP-Server hört standardmäßig nur auf 127.0.0.1. Für Zugriff von einem anderen Rechner aus dem Netzwerk wäre eine Anpassung (Binding auf 0.0.0.0 oder Reverse-Proxy) nötig.
+  Der MCP-Server hört nur auf 127.0.0.1. Zugriff von außen nur per SSH-Tunnel (siehe Schritt 6) oder nach Anpassung des Moduls/Server auf 0.0.0.0.
 
-Bei weiteren Fragen hilft die [Symcon-Dokumentation](https://www.symcon.de/de/service/dokumentation/) und das [Symcon-Forum](https://www.symcon.de/forum/).
+Bei weiteren Fragen: [Symcon-Dokumentation](https://www.symcon.de/de/service/dokumentation/), [Symcon-Forum](https://www.symcon.de/forum/), [SymBox-Installation](https://www.symcon.de/de/service/dokumentation/installation/symbox).
