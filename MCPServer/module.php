@@ -22,8 +22,13 @@ class MCPServer extends IPSModule
         parent::Create();
         $this->RegisterPropertyInteger('Port', self::DEFAULT_PORT);
         $this->RegisterPropertyString('SymconApiUrl', self::DEFAULT_API_URL);
-        $this->RegisterPropertyString('ApiKey', '');
+        $this->RegisterPropertyString('ApiKey', $this->generateApiKey());
         $this->RegisterPropertyBoolean('Active', true);
+    }
+
+    private function generateApiKey(): string
+    {
+        return bin2hex(random_bytes(32));
     }
 
     public function Destroy(): void

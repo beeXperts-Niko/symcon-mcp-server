@@ -22,7 +22,7 @@
     },
     {
       "type": "Label",
-      "caption": "Optional: API-Key zum Schutz des MCP-Servers. Wenn gesetzt, müssen Clients den Key mitsenden (Header \"Authorization: Bearer <Key>\" oder \"X-MCP-API-Key: <Key>\"). Leer = keine Authentifizierung."
+      "caption": "Beim Anlegen der Instanz wird automatisch ein API-Key erzeugt. Clients müssen ihn mitsenden (Header \"Authorization: Bearer <Key>\" oder \"X-MCP-API-Key: <Key>\"). Key hier kopieren und in Cursor/Client eintragen. Leer lassen = keine Authentifizierung (unsicher im Netz)."
     },
     {
       "type": "ValidationTextBox",
