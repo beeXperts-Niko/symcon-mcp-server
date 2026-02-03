@@ -1,8 +1,8 @@
 {
   "MCP Server": {
-    "Port": "Port",
-    "SymconApiUrl": "Symcon API URL",
-    "Active": "Aktiv",
+    "Port": "TCP-Port für den MCP-Server (z. B. 4096)",
+    "SymconApiUrl": "Symcon-API-URL (z. B. http://127.0.0.1:3777/api/)",
+    "Active": "MCP-Server starten (bei „Änderungen übernehmen“)",
     "ProcessStarted": "MCP-Server gestartet",
     "ProcessStopped": "MCP-Server beendet",
     "InvalidPort": "Ungültiger Port",
