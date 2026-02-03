@@ -10,10 +10,11 @@ Symcon-Bibliothek mit dem Modul **MCP Server**: Ein PHP-Wrapper startet einen No
 
 ## Installation
 
-1. Bibliothek über **Module Control** hinzufügen (Repository-URL oder lokalen Pfad zu `symcon-mcp-server` angeben).
+1. Bibliothek über **Module Control** hinzufügen (Repository-URL oder lokalen Pfad zu `symcon-mcp-server` angeben). Das Repo enthält den vorgebauten MCP-Server (`libs/mcp-server/dist/`) – bei Git-Installation ist kein eigener Build nötig.
 2. Unter „Instanz hinzufügen“ das Modul **MCP Server** auswählen.
 3. **Port** (z. B. 4096) und **Symcon API URL** (z. B. `http://127.0.0.1:3777/api/`) konfigurieren, **Aktiv** setzen, Änderungen übernehmen.
-4. Auf dem Symcon-Server im Ordner `libs/mcp-server/` einmalig ausführen: `npm install` und `npm run build`.
+
+Ausführlich: [ANLEITUNG_INSTALLATION.md](ANLEITUNG_INSTALLATION.md).
 
 ## Konfiguration
 
@@ -33,3 +34,5 @@ Symcon-Bibliothek mit dem Modul **MCP Server**: Ein PHP-Wrapper startet einen No
 - `symcon_get_variable` – Variablen-Infos (variableId)
 
 Ein MCP-Client (z. B. ein KI-fähiger Editor oder ein eigener KI-Assistent) verbindet sich per Streamable HTTP mit `http://127.0.0.1:<Port>` (POST/GET am gleichen Endpunkt). Der spätere „smarte Helfer“ wird in einem separaten Schritt entwickelt und nutzt diesen MCP-Server.
+
+**Entwicklung:** Wenn Sie den TypeScript-Code in `libs/mcp-server/src/` ändern: `npm run build` in `libs/mcp-server/` ausführen und die aktualisierten Dateien in `libs/mcp-server/dist/` mit ins Repo committen, damit Git-Installationen die neueste Version bekommen.
