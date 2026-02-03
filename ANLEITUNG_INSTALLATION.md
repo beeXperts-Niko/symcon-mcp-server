@@ -273,4 +273,29 @@ MCP_PORT=4096 SYMCON_API_URL=http://127.0.0.1:3777/api/ npm run start
 - **„Loading Tools“ bleibt hängen**  
   (1) Symcon: Instanz „MCP Server“ → **Aktiv** gesetzt, **Änderungen übernehmen** – oben sollte dann **[OK] MCP-Server läuft** stehen (oder „Port in Benutzung“). (2) Erreichbarkeit vom Rechner des MCP-Clients: `curl -s -o /dev/null -w "%{http_code}" http://<SymBox-IP>:4096` – sollte 200 oder 405 liefern, nicht 000 (Firewall/Netzwerk prüfen). (3) API-Key im MCP-Client (Header `Authorization: Bearer <Key>`) muss exakt dem in Symcon entsprechen. (4) MCP-Client neu starten.
 
+---
+
+## Symcon-Log per SSH abrufen (Debugging)
+
+Wenn das Modul nicht läuft und Sie SSH-Zugang zur SymBox haben, können Sie das Symcon-Log direkt abrufen:
+
+**Skript im Projektordner** (z. B. vom Mac aus):
+
+```bash
+cd symcon-mcp-server
+./fetch-symcon-log.sh root@192.168.10.12
+```
+
+- Erster Parameter: SSH-Ziel (Standard: `root@192.168.10.12`).
+- Zweiter Parameter (optional): Anzahl Zeilen (Standard: 100), z. B. `./fetch-symcon-log.sh root@192.168.10.12 500`.
+- Nur MCP-Einträge anzeigen: `./fetch-symcon-log.sh root@192.168.10.12 200 | grep -i mcp`
+
+Das Skript sucht das Symcon-Log unter `/var/lib/symcon/logs/` und `/mnt/data/symcon/logs/` und gibt die letzten Zeilen aus (u. a. PHPLibrary, MCPServer, Fehler beim Modulstart).
+
+**Ohne Skript (manuell per SSH):**
+
+```bash
+ssh root@192.168.10.12 "tail -100 /var/lib/symcon/logs/log_*.txt 2>/dev/null || tail -100 /mnt/data/symcon/logs/log_*.txt"
+```
+
 Bei weiteren Fragen: [Symcon-Dokumentation](https://www.symcon.de/de/service/dokumentation/), [Symcon-Forum](https://www.symcon.de/forum/), [SymBox-Installation](https://www.symcon.de/de/service/dokumentation/installation/symbox).
