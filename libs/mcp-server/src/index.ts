@@ -11,7 +11,8 @@ import { createToolHandlers } from './tools/index.js';
 
 const PORT = parseInt(process.env.MCP_PORT ?? '4096', 10);
 const SYMCON_API_URL = process.env.SYMCON_API_URL ?? 'http://127.0.0.1:3777/api/';
-const HOST = '127.0.0.1';
+/** Bind on all interfaces (0.0.0.0) so the server is reachable at http://<SymBox-IP>:PORT from your Mac/PC. */
+const HOST = process.env.MCP_BIND ?? '0.0.0.0';
 
 function readBody(req: import('node:http').IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -64,7 +65,8 @@ async function main(): Promise<void> {
 
   const server = createServer(async (req, res) => {
     const origin = req.headers.origin;
-    if (origin && origin !== `http://${HOST}:${PORT}` && origin !== `http://127.0.0.1:${PORT}`) {
+    const allowedOrigins = [`http://127.0.0.1:${PORT}`, `http://localhost:${PORT}`];
+    if (origin && !allowedOrigins.includes(origin) && HOST === '127.0.0.1') {
       res.writeHead(403, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Origin not allowed' }));
       return;
@@ -74,7 +76,7 @@ async function main(): Promise<void> {
   });
 
   server.listen(PORT, HOST, () => {
-    process.stderr.write(`Symcon MCP Server listening on http://${HOST}:${PORT}\n`);
+    process.stderr.write(`Symcon MCP Server listening on port ${PORT} (${HOST === '0.0.0.0' ? 'all interfaces, use http://<SymBox-IP>:' + PORT : HOST + ':' + PORT})\n`);
     process.stderr.write(`Symcon API: ${SYMCON_API_URL}\n`);
   });
 }
