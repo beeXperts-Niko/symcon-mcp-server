@@ -17,6 +17,14 @@ function getArgs(args) {
 }
 export function createToolHandlers(client) {
     return {
+        symcon_ping: {
+            description: 'Verbindungs-/Auth-Test zur Symcon-API. Ruft IPS_GetKernelVersion auf und liefert die Kernel-Version zurück. Wenn hier 401 kommt, fehlt Remote-Access Basic-Auth (oder SYMCON_API_URL ist falsch).',
+            inputSchema: z.object({}),
+            handler: async (_args) => {
+                const kernelVersion = await client.call('IPS_GetKernelVersion', []);
+                return { content: [{ type: 'text', text: JSON.stringify({ ok: true, kernelVersion }) }] };
+            },
+        },
         symcon_get_value: {
             description: 'Liest den Wert einer Symcon-Variable (GetValue).',
             inputSchema: variableIdSchema,
