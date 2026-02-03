@@ -219,8 +219,8 @@ class MCPServer extends IPSModule
         }
     }
 
-    /** Schreibt ins Debug-Protokoll der Instanz (und ins allgemeine Log). */
-    private function sendDebug(string $message): void
+    /** Schreibt ins Debug-Protokoll der Instanz (und ins allgemeine Log). Sichtbarkeit protected wie in IPSModule. */
+    protected function sendDebug(string $message): void
     {
         IPS_LogMessage((string) $this->InstanceID, $message);
     }
