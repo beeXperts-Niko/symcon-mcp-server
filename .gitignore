@@ -10,6 +10,8 @@ yarn-error.log*
 # Environments / secrets
 .env
 .env.*
+# Lokale Symcon-Config (E-Mail/URL) – Passwort nie eintragen, wird beim Start abgefragt
+local-config.env
 
 # Node
 **/node_modules/
