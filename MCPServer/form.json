@@ -22,7 +22,7 @@
     },
     {
       "type": "Label",
-      "caption": "Beim Anlegen der Instanz wird automatisch ein API-Key erzeugt. Clients müssen ihn mitsenden (Header \"Authorization: Bearer <Key>\" oder \"X-MCP-API-Key: <Key>\"). Key hier kopieren und in Cursor/Client eintragen. Leer lassen = keine Authentifizierung (unsicher im Netz)."
+      "caption": "Beim ersten \"Änderungen übernehmen\" wird automatisch ein API-Key erzeugt und hier angezeigt. Key kopieren und in Cursor/Client eintragen (Header \"Authorization: Bearer <Key>\" oder \"X-MCP-API-Key: <Key>\"). Leer lassen = keine Authentifizierung (unsicher im Netz)."
     },
     {
       "type": "ValidationTextBox",

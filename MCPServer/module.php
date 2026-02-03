@@ -47,6 +47,18 @@ class MCPServer extends IPSModule
         $apiKey = trim((string) $this->ReadPropertyString('ApiKey'));
         $active = (bool) $this->ReadPropertyBoolean('Active');
 
+        // Leeren API-Key automatisch erzeugen und in die Konfiguration schreiben (damit er im Formular angezeigt wird)
+        if ($apiKey === '') {
+            $apiKey = $this->generateApiKey();
+            $config = IPS_GetConfiguration($this->InstanceID);
+            $data = json_decode($config, true);
+            if (is_array($data)) {
+                $data['ApiKey'] = $apiKey;
+                IPS_SetConfiguration($this->InstanceID, json_encode($data));
+                IPS_ApplyChanges($this->InstanceID);
+            }
+        }
+
         if (!$active || $port < 1024 || $port > 65535 || $apiUrl === '') {
             return;
         }
