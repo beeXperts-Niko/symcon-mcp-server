@@ -86,7 +86,7 @@ async function main(): Promise<void> {
   await mcp.connect(transport);
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    // Auth nur für POST (JSON-RPC). GET (SSE-Stream) oft ohne Header – sonst hängt Cursor bei "Loading Tools".
+    // Auth nur für POST (JSON-RPC). GET (SSE-Stream) oft ohne Header – sonst hängen manche MCP-Clients bei "Loading Tools".
     if (req.method === 'POST' && !isAuthorized(req)) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Unauthorized', message: 'Missing or invalid API key' }));

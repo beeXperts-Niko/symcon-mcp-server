@@ -167,7 +167,7 @@ Auf der SymBox in `/var/lib/symcon/user/symcon-mcp-server/libs/mcp-server/` die 
    - **Symcon API URL:**  
      `http://127.0.0.1:3777/api/`  
      (Symcon läuft auf derselben SymBox; 3777 = Standard-Webserver.)
-   - **API-Key (optional):** Wenn Sie den MCP-Server schützen wollen, tragen Sie einen geheimen Schlüssel ein (z. B. ein langes Zufallspasswort). Jeder Client (Cursor, Inspector, curl) muss dann denselben Key mitsenden (Header `Authorization: Bearer <Key>` oder `X-MCP-API-Key: <Key>`). Leer = keine Authentifizierung – dann kann jeder im Netzwerk den Port nutzen.
+   - **API-Key (optional):** Wenn Sie den MCP-Server schützen wollen, tragen Sie einen geheimen Schlüssel ein (z. B. ein langes Zufallspasswort). Jeder Client (Claude, MCP Inspector, curl) muss dann denselben Key mitsenden (Header `Authorization: Bearer <Key>` oder `X-MCP-API-Key: <Key>`). Leer = keine Authentifizierung – dann kann jeder im Netzwerk den Port nutzen.
    - **Aktiv:** Haken setzen.
 
 5. **„Änderungen übernehmen“** klicken.
@@ -215,15 +215,15 @@ Erwartung: JSON-Antwort mit `result` (z. B. Server-Infos), kein „Connection 
 2. **Streamable HTTP** wählen, URL eintragen: **http://192.168.10.12:4096**
 3. Verbinden – danach die **Tools** (z. B. `symcon_get_value`, `symcon_set_value`) mit echten Symcon-Variablen-IDs testen.
 
-### 3. In Cursor als MCP-Server nutzen
+### 3. In Claude oder anderem MCP-Client nutzen
 
-1. Cursor: **Einstellungen** → **MCP** → **Server hinzufügen**.
+1. In Ihrem KI-Agenten (z. B. Claude): **Einstellungen** → **MCP** → **Server hinzufügen**.
 2. **Streamable HTTP**, URL: **http://192.168.10.12:4096** (SymBox-IP und Port anpassen).
 3. **Falls Sie einen API-Key in Symcon gesetzt haben:** Unter „Headers“ eintragen:  
    - Name: `Authorization`, Wert: `Bearer IHR_API_KEY` (IHR_API_KEY durch den in Symcon konfigurierten Key ersetzen),  
    - oder Name: `X-MCP-API-Key`, Wert: `IHR_API_KEY`.  
    Ohne API-Key: Headers leer lassen.
-4. Speichern – Cursor verbindet sich mit dem Symcon-MCP-Server; in Chats z. B. „Lies Variable 12345“ (mit echten IDs aus Symcon).
+4. Speichern – der MCP-Client verbindet sich mit dem Symcon-MCP-Server; in Chats z. B. „Lies Variable 12345“ (mit echten IDs aus Symcon).
 
 ### 4. Optional: Nur localhost (SSH-Tunnel)
 
@@ -252,7 +252,7 @@ MCP_PORT=4096 SYMCON_API_URL=http://127.0.0.1:3777/api/ npm run start
 | In der Konsole: Instanz „MCP Server“ angelegt | ☐ |
 | Port (z. B. 4096), Symcon API URL `http://127.0.0.1:3777/api/`, optional API-Key, „Aktiv“ gesetzt | ☐ |
 | „Änderungen übernehmen“ geklickt | ☐ |
-| Bei API-Key: Cursor/Client mit Header `Authorization: Bearer <Key>` oder `X-MCP-API-Key: <Key>` konfiguriert | ☐ |
+| Bei API-Key: Claude/MCP-Client mit Header `Authorization: Bearer <Key>` oder `X-MCP-API-Key: <Key>` konfiguriert | ☐ |
 
 ---
 
@@ -268,9 +268,9 @@ MCP_PORT=4096 SYMCON_API_URL=http://127.0.0.1:3777/api/ npm run start
   SymBox-IP und Port prüfen (z. B. `http://192.168.10.12:4096`). MCP-Server hört standardmäßig auf allen Schnittstellen (0.0.0.0). Firewall auf der SymBox prüfen, ob Port 4096 erlaubt ist.
 
 - **„401 Unauthorized“ / „Missing or invalid API key“**  
-  Sie haben in Symcon einen API-Key gesetzt. In Cursor (MCP-Einstellungen) unter Headers eintragen: `Authorization: Bearer IHR_KEY` oder `X-MCP-API-Key: IHR_KEY`. Key muss exakt dem in Symcon entsprechen.
+  Sie haben in Symcon einen API-Key gesetzt. In Claude oder anderem MCP-Client (MCP-Einstellungen) unter Headers eintragen: `Authorization: Bearer IHR_KEY` oder `X-MCP-API-Key: IHR_KEY`. Key muss exakt dem in Symcon entsprechen.
 
 - **„Loading Tools“ bleibt hängen**  
-  (1) Erreichbarkeit prüfen: `curl -s -o /dev/null -w "%{http_code}" http://<SymBox-IP>:4096` – sollte z. B. 200 oder 405 liefern, nicht 000. (2) Symcon: Instanz „MCP Server“ → **Aktiv** gesetzt, **Änderungen übernehmen**. (3) Modul auf neueste Version (Auth nur für POST, GET/SSE ohne Key) – dann Cursor neu starten.
+  (1) Erreichbarkeit prüfen: `curl -s -o /dev/null -w "%{http_code}" http://<SymBox-IP>:4096` – sollte z. B. 200 oder 405 liefern, nicht 000. (2) Symcon: Instanz „MCP Server“ → **Aktiv** gesetzt, **Änderungen übernehmen**. (3) Modul auf neueste Version (Auth nur für POST, GET/SSE ohne Key) – dann MCP-Client (z. B. Claude) neu starten.
 
 Bei weiteren Fragen: [Symcon-Dokumentation](https://www.symcon.de/de/service/dokumentation/), [Symcon-Forum](https://www.symcon.de/forum/), [SymBox-Installation](https://www.symcon.de/de/service/dokumentation/installation/symbox).

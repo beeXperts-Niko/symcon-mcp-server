@@ -2,7 +2,7 @@
   "elements": [
     {
       "type": "Label",
-      "caption": "TCP-Port, auf dem der MCP-Server lauscht. MCP-Clients (z. B. Cursor) verbinden sich zu diesem Port. Beispiel: 4096."
+      "caption": "TCP-Port, auf dem der MCP-Server lauscht. MCP-Clients (z. B. Claude, andere KI-Agenten) verbinden sich zu diesem Port. Beispiel: 4096."
     },
     {
       "type": "NumberSpinner",
@@ -22,7 +22,7 @@
     },
     {
       "type": "Label",
-      "caption": "Beim ersten \"Änderungen übernehmen\" wird automatisch ein API-Key erzeugt und hier angezeigt. Key kopieren und in Cursor/Client eintragen (Header \"Authorization: Bearer <Key>\" oder \"X-MCP-API-Key: <Key>\"). Leer lassen = keine Authentifizierung (unsicher im Netz)."
+      "caption": "Beim ersten \"Änderungen übernehmen\" wird automatisch ein API-Key erzeugt und hier angezeigt. Key kopieren und in Claude oder anderen MCP-Client eintragen (Header \"Authorization: Bearer <Key>\" oder \"X-MCP-API-Key: <Key>\"). Leer lassen = keine Authentifizierung (unsicher im Netz)."
     },
     {
       "type": "ValidationTextBox",

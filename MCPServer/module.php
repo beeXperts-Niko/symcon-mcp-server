@@ -86,7 +86,7 @@ class MCPServer extends IPSModule
         $port = (int) $this->ReadPropertyInteger('Port');
         $status = $this->getProcessStatus();
         $statusCaption = $status['running']
-            ? sprintf('[OK] MCP-Server läuft auf Port %d (PID: %s). Cursor: http://<SymBox-IP>:%d', $port, $status['pid'], $port)
+            ? sprintf('[OK] MCP-Server läuft auf Port %d (PID: %s). MCP-Client (z. B. Claude): http://<SymBox-IP>:%d', $port, $status['pid'], $port)
             : '[--] MCP-Server gestoppt. Aktiv setzen und Änderungen übernehmen klicken.';
         array_unshift($form['elements'], [
             'type'    => 'Label',

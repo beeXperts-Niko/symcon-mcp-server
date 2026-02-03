@@ -1,7 +1,7 @@
 {
   "MCP Server": {
     "Port": "Port",
-    "PortBeschreibung": "TCP-Port, auf dem der MCP-Server lauscht. MCP-Clients (z. B. Cursor) verbinden sich zu diesem Port. Beispiel: 4096.",
+    "PortBeschreibung": "TCP-Port, auf dem der MCP-Server lauscht. MCP-Clients (z. B. Claude, andere KI-Agenten) verbinden sich zu diesem Port. Beispiel: 4096.",
     "SymconApiUrl": "Symcon-API-URL",
     "SymconApiUrlBeschreibung": "Basis-URL der Symcon JSON-RPC-API. Läuft Symcon auf derselben Box, z. B.: http://127.0.0.1:3777/api/",
     "Active": "Aktiv",
