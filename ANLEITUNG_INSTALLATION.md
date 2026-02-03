@@ -191,6 +191,66 @@ Symcon startet dann den Node-Prozess (MCP-Server). **Wichtig:** Auf der SymBox m
 
 ---
 
+## MCP-Server testen
+
+Der MCP-Server hört nur auf **127.0.0.1** (localhost) auf der SymBox. Von Ihrem Mac aus testen Sie deshalb per **SSH-Tunnel** oder lokal (wenn Sie den MCP-Server zum Test auf dem Mac starten).
+
+### 1. SSH-Tunnel zur SymBox (von Ihrem Mac)
+
+Damit Ihr Mac den MCP-Server auf der SymBox erreicht:
+
+```bash
+ssh -L 4096:127.0.0.1:4096 BENUTZER@192.168.10.12
+```
+
+- `BENUTZER` durch Ihren SSH-Benutzernamen auf der SymBox ersetzen (falls SSH aktiv ist).
+- Tunnel offen lassen. Dann gilt: Auf Ihrem Mac ist **http://127.0.0.1:4096** = MCP-Server auf der SymBox.
+
+### 2. Schnelltest mit curl (nach Tunnel oder lokal)
+
+Ob der MCP-Server antwortet (Initialize-Anfrage):
+
+```bash
+curl -X POST http://127.0.0.1:4096 \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
+```
+
+Erwartung: JSON-Antwort mit `result` (z. B. Server-Infos), kein „Connection refused“.
+
+### 3. MCP Inspector (Tools im Browser testen)
+
+[MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) kann sich per **Streamable HTTP** mit einem MCP-Server verbinden:
+
+1. **Tunnel starten** (siehe oben), damit `http://127.0.0.1:4096` auf Ihrem Mac den Symcon-MCP-Server erreicht.
+2. Inspector starten:
+   ```bash
+   npx @modelcontextprotocol/inspector
+   ```
+3. Im Inspector **Streamable HTTP** wählen und als URL eintragen: **http://127.0.0.1:4096**
+4. Verbinden – danach können Sie die **Tools** (z. B. `symcon_get_value`, `symcon_set_value`) aufrufen und mit echten Variablen-IDs testen.
+
+### 4. In Cursor als MCP-Server nutzen
+
+1. **Tunnel** zur SymBox laufen lassen (siehe oben).
+2. In Cursor: **Einstellungen** → **MCP** (oder „Features“ → MCP) → **Server hinzufügen**.
+3. Bei **Streamable HTTP** die URL eintragen: **http://127.0.0.1:4096**
+4. Speichern – Cursor verbindet sich mit dem Symcon-MCP-Server; Sie können in Chats z. B. „Lies Variable 12345“ oder „Führe Skript 67890 aus“ nutzen (mit echten IDs aus Symcon).
+
+### 5. MCP-Server lokal auf dem Mac testen (ohne SymBox)
+
+Wenn Sie nur das Modul/den Code testen wollen, ohne Symcon:
+
+```bash
+cd symcon-mcp-server/libs/mcp-server
+MCP_PORT=4096 SYMCON_API_URL=http://127.0.0.1:3777/api/ npm run start
+```
+
+- Dann läuft der MCP-Server auf dem Mac auf Port 4096. **Symcon** muss unter `http://127.0.0.1:3777/api/` erreichbar sein (z. B. Symcon lokal oder Tunnel zur SymBox auf 3777). Tools wie `symcon_get_value` rufen dann diese API auf.
+
+---
+
 ## Kurz-Checkliste (SymBox/SymOS)
 
 | Schritt | Erledigt? |
