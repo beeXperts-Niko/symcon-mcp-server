@@ -1,6 +1,6 @@
 {
   "name": "symcon-mcp-server",
-  "version": "1.3.29",
+  "version": "1.3.30",
   "description": "MCP Server for IP-Symcon - exposes Symcon API as MCP tools",
   "author": "Niko Sinthern",
   "type": "module",

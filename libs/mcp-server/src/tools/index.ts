@@ -46,7 +46,8 @@ export function createToolHandlers(client: SymconClient): Record<string, { descr
       },
     },
     symcon_set_value: {
-      description: 'Setzt den Wert einer Symcon-Variable (SetValue).',
+      description:
+        'Setzt den Wert einer Symcon-Variable (SetValue). Für Licht ein/aus bei Hue und ähnlichen Aktoren stattdessen symcon_request_action nutzen – nur RequestAction löst die physische Schaltung aus.',
       inputSchema: setValueSchema,
       handler: async (args: HandlerArgs) => {
         const { variableId, value } = getArgs<z.infer<typeof setValueSchema>>(args);
@@ -55,7 +56,8 @@ export function createToolHandlers(client: SymconClient): Record<string, { descr
       },
     },
     symcon_request_action: {
-      description: 'Führt die Aktion einer Symcon-Variable aus (RequestAction).',
+      description:
+        'Führt die Aktion einer Symcon-Variable aus (RequestAction). Standard für Licht ein/aus bei Hue, Homematic und ähnlichen Aktoren – löst die physische Schaltung aus; SetValue allein reicht dort oft nicht.',
       inputSchema: z.object({ variableId: z.number().int().positive(), value: z.union([z.string(), z.number(), z.boolean()]).optional() }),
       handler: async (args: HandlerArgs) => {
         const { variableId, value } = getArgs<{ variableId: number; value?: unknown }>(args);
@@ -154,7 +156,7 @@ export function createToolHandlers(client: SymconClient): Record<string, { descr
     },
     symcon_control_device: {
       description:
-        'Steuert ein Gerät per Ort und Name (Sprachsteuerung). Sucht unter Root nach dem Ort (z. B. "Büro"), dann nach dem Gerät (z. B. "Licht"), setzt die Variable auf ein/aus. Aktion: "ein", "an", "on" = an; "aus", "off" = aus.',
+        'Steuert ein Gerät per Ort und Name (Sprachsteuerung). Sucht unter Root nach dem Ort (z. B. "Büro"), dann nach dem Gerät (z. B. "Licht"), schaltet ein/aus per RequestAction (wichtig für Hue und ähnliche Aktoren – nur RequestAction löst die physische Schaltung aus). Aktion: "ein", "an", "on" = an; "aus", "off" = aus.',
       inputSchema: z.object({
         location: z.string().describe('Ort/Raum, z. B. "Büro", "Wohnzimmer"'),
         deviceName: z.string().describe('Gerät, z. B. "Licht", "Deckenlicht"'),
@@ -238,14 +240,14 @@ export function createToolHandlers(client: SymconClient): Record<string, { descr
           };
         }
 
-        await client.setValue(variableId, value);
+        await client.requestAction(variableId, value);
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify({
                 ok: true,
-                message: `${deviceName} in ${location} ${value ? 'ein' : 'aus'}geschaltet (VariableID ${variableId}).`,
+                message: `${deviceName} in ${location} ${value ? 'ein' : 'aus'}geschaltet (VariableID ${variableId}, RequestAction).`,
               }),
             },
           ],
