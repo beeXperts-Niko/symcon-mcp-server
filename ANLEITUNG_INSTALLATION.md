@@ -291,6 +291,10 @@ Wenn Cursor sich nicht zur SymBox (z. B. 192.168.10.12:4096) verbinden kann (F
   (1) Symcon: Instanz „MCP Server“ → **Aktiv** gesetzt, **Änderungen übernehmen** – oben sollte dann **[OK] MCP-Server läuft** stehen (oder „Port in Benutzung“). (2) Erreichbarkeit vom Rechner des MCP-Clients: `curl -s -o /dev/null -w "%{http_code}" http://<SymBox-IP>:4096` – sollte 200 oder 405 liefern, nicht 000 (Firewall/Netzwerk prüfen). (3) API-Key im MCP-Client (Header `Authorization: Bearer <Key>`) muss exakt dem in Symcon entsprechen. (4) MCP-Client neu starten.  
   **Workaround:** Wenn die SymBox von Ihrem Mac aus nicht erreichbar ist, können Sie den MCP-Server **lokal auf dem Mac** starten und Cursor mit **http://127.0.0.1:4096** verbinden – siehe Abschnitt „MCP-Server lokal starten (Loading Tools)“ unten.
 
+- **„fetch failed: self signed certificate“ (Cursor)**  
+  Cursor vertraut **self-signed Zertifikaten** standardmäßig nicht. Wenn der Symcon MCP-Server mit HTTPS läuft und Sie in Cursor **https://127.0.0.1:4096** eintragen, schlägt die Verbindung mit diesem Fehler fehl.  
+  **Lösung:** Server mit **HTTP** starten: `MCP_HTTP=1 ./start-mcp-local.sh` (erzwingt HTTP trotz vorhandener Zertifikate). In Cursor **http://127.0.0.1:4096** eintragen. Für Claude „Benutzerdefinierten Connector“ können Sie den Server ohne `MCP_HTTP=1` starten und HTTPS nutzen.
+
 ---
 
 ## Symcon-Log per SSH abrufen (Debugging)

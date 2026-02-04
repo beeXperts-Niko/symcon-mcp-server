@@ -181,3 +181,5 @@ Wenn du **„Benutzerdefinierten Connector hinzufügen“** in Claude nutzen wil
 3. **In Claude:** Unter Konnektoren → Benutzerdefinierten Connector hinzufügen → URL: **https://127.0.0.1:4096**. (Self-signed: Claude/Browser kann eine Sicherheitswarnung anzeigen – für localhost in der Regel akzeptierbar.)
 
 **Hinweis:** Die **.mcpb-Erweiterung** und die **Config-Datei** funktionieren weiterhin mit **http** – HTTPS ist nur nötig, wenn du explizit die Connector-URL in Claude eintragen willst.
+
+**Cursor:** Cursor akzeptiert **self-signed Zertifikate** in der Regel nicht (Fehler: „self signed certificate“). Für Cursor Server mit **HTTP** starten: `MCP_HTTP=1 ./start-mcp-local.sh`, dann in Cursor **http://127.0.0.1:4096** eintragen. Siehe auch ANLEITUNG_INSTALLATION.md → „self signed certificate“.

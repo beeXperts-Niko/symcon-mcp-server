@@ -60,8 +60,12 @@ if [ -n "$SYMCON_USER" ] && [ -n "$SYMCON_PASS" ]; then
   echo "Symcon-Anmeldung OK."
 fi
 
-# Optional HTTPS: wenn certs vorhanden, MCP_HTTPS=1 setzen (für Claude „Benutzerdefinierten Connector“ mit https://)
-if [ -f "$MCP_DIR/certs/server.crt" ] && [ -f "$MCP_DIR/certs/server.key" ]; then
+# Optional HTTPS: wenn certs vorhanden, MCP_HTTPS=1 setzen (für Claude „Benutzerdefinierten Connector“ mit https://).
+# Für Cursor („self signed certificate“): HTTP erzwingen mit MCP_HTTP=1 ./start-mcp-local.sh
+if [ "${MCP_HTTP:-0}" = "1" ] || [ "${MCP_HTTPS:-}" = "0" ]; then
+  export MCP_HTTPS=0
+  echo "HTTP erzwungen (MCP_HTTP=1 oder MCP_HTTPS=0) – für Cursor mit http://127.0.0.1:4096"
+elif [ -f "$MCP_DIR/certs/server.crt" ] && [ -f "$MCP_DIR/certs/server.key" ]; then
   export MCP_HTTPS=1
   export MCP_TLS_CERT="$MCP_DIR/certs/server.crt"
   export MCP_TLS_KEY="$MCP_DIR/certs/server.key"
