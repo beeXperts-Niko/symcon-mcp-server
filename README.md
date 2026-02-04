@@ -51,3 +51,9 @@ Wenn die KI nicht weiß, welches Gerät gemeint ist (z. B. „Ambiente-Licht i
 Ein MCP-Client (z. B. ein KI-fähiger Editor oder ein eigener KI-Assistent) verbindet sich per Streamable HTTP mit `http://127.0.0.1:<Port>` (POST/GET am gleichen Endpunkt). Der spätere „smarte Helfer“ wird in einem separaten Schritt entwickelt und nutzt diesen MCP-Server.
 
 **Entwicklung:** Wenn Sie den TypeScript-Code in `libs/mcp-server/src/` ändern: `npm run build` in `libs/mcp-server/` ausführen und die aktualisierten Dateien in `libs/mcp-server/dist/` mit ins Repo committen, damit Git-Installationen die neueste Version bekommen.
+
+## Dokumentation
+
+- [docs/STEUERUNG_HINWEISE.md](docs/STEUERUNG_HINWEISE.md) – Steuerungshinweise für KI und MCP-Clients (z. B. Hue: RequestAction für Ein/Aus und Helligkeit, Skala 0–254).
+- [docs/CLAUDE_EINBINDEN.md](docs/CLAUDE_EINBINDEN.md) – Claude/.mcpb-Einbindung.
+- [docs/MODULREFERENZ.md](docs/MODULREFERENZ.md) – Modulreferenz (Geräte) von Symcon.

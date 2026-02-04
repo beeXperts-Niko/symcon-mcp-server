@@ -39,7 +39,7 @@ export function createToolHandlers(client) {
             },
         },
         symcon_set_value: {
-            description: 'Setzt den Wert einer Symcon-Variable (SetValue). Für Licht ein/aus bei Hue und ähnlichen Aktoren stattdessen symcon_request_action nutzen – nur RequestAction löst die physische Schaltung aus.',
+            description: 'Setzt den Wert einer Symcon-Variable (SetValue). Für Licht ein/aus und für Helligkeit/Dimmer bei Hue und ähnlichen Aktoren stattdessen symcon_request_action nutzen – nur RequestAction löst die physische Schaltung aus. Hue-Helligkeit (VariableProfile Intensity.Hue): Skala 0–254, Steuerung nur per RequestAction.',
             inputSchema: setValueSchema,
             handler: async (args) => {
                 const { variableId, value } = getArgs(args);
@@ -48,7 +48,7 @@ export function createToolHandlers(client) {
             },
         },
         symcon_request_action: {
-            description: 'Führt die Aktion einer Symcon-Variable aus (RequestAction). Standard für Licht ein/aus bei Hue, Homematic und ähnlichen Aktoren – löst die physische Schaltung aus; SetValue allein reicht dort oft nicht.',
+            description: 'Führt die Aktion einer Symcon-Variable aus (RequestAction). Standard für Licht ein/aus und für Helligkeit/Dimmer bei Hue, Homematic und ähnlichen Aktoren – löst die physische Schaltung aus; SetValue allein reicht dort oft nicht. Hue-Helligkeit (Variable „Helligkeit“, Profil Intensity.Hue): Wert 0–254 (z. B. 5 % ≈ 13), immer RequestAction verwenden.',
             inputSchema: z.object({ variableId: z.number().int().positive(), value: z.union([z.string(), z.number(), z.boolean()]).optional() }),
             handler: async (args) => {
                 const { variableId, value } = getArgs(args);
@@ -93,7 +93,7 @@ export function createToolHandlers(client) {
             },
         },
         symcon_get_variable: {
-            description: 'Liefert Variablen-Infos (IPS_GetVariable). Enthält u. a. Variablentyp (Boolean, Integer, …) – wichtig, um zu wissen, wie man „Licht aus“ umsetzt (z. B. Boolean false, Dimmer 0).',
+            description: 'Liefert Variablen-Infos (IPS_GetVariable). Enthält Variablentyp (Boolean, Integer, …) und VariableProfile (z. B. Intensity.Hue). Bei Intensity.Hue: Helligkeit 0–254, Steuerung per RequestAction (nicht SetValue). Wichtig, um „Licht aus“ oder „5 % Helligkeit“ korrekt umzusetzen.',
             inputSchema: variableIdSchema,
             handler: async (args) => {
                 const { variableId } = getArgs(args);
