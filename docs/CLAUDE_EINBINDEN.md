@@ -2,6 +2,8 @@
 
 So nutzt du dein Symcon-Smart-Home **mit Claude** (Anthropic): MCP-Server verbinden + Anweisungen für „erster Überblick“ und interaktives Reden.
 
+**Hinweis:** Claude setzt bei Konnektoren-URLs **HTTPS** voraus. Der Symcon MCP-Server läuft unter HTTP – nutze daher die **.mcpb-Erweiterung** oder die **Config-Datei** (siehe unten).
+
 ---
 
 ## „Ziehe .MCPB- oder .DXT-Dateien hier her“ – was bedeutet das?
