@@ -347,9 +347,9 @@ export function createToolHandlers(client: SymconClient): Record<string, { descr
     },
     symcon_snapshot_variables: {
       description:
-        'Liefert einen Snapshot aller Variablenwerte unter einer Wurzel (Vorher-Zustand). Nutzen: Wenn die KI nicht weiß, welches Gerät der User meint, zuerst diesen Snapshot aufrufen, dann den User bitten (z. B. „Schalte das Licht bitte kurz ein“), danach symcon_diff_variables mit diesem Snapshot aufrufen – die geänderten Variablen zeigen, welches Licht/Gerät gemeint ist. Optional rootId z. B. Räume/Erdgeschoss/Flur (Objekt-ID), um nur einen Bereich zu erfassen.',
+        'Liefert einen Snapshot aller Variablenwerte unter einer Wurzel (Vorher-Zustand). Wichtig: Immer rootId der relevanten Raums/ Bereichs verwenden (Objekt-ID des Raums, z. B. Büro), nie rootId 0 – sonst sind tausende Variablen (Sensoren, sich ändernde Werte) drin und verfälschen den Diff. User-Anweisung: „Schalte das Gerät jetzt ein oder aus – egal welche Richtung –, sag Bescheid wenn fertig.“ Danach symcon_diff_variables mit diesem Snapshot aufrufen.',
       inputSchema: z.object({
-        rootId: z.number().int().min(0).optional().describe('Wurzel (0 = gesamter Baum); z. B. Objekt-ID eines Raums wie Flur'),
+        rootId: z.number().int().min(0).optional().describe('Objekt-ID des Raums/Bereichs (z. B. Büro); 0 = gesamter Baum – nur nutzen wenn kein Raum bekannt, sonst Ergebnis verfälscht'),
         maxDepth: z.number().int().min(1).max(6).optional().describe('Maximale Tiefe (Standard 5)'),
       }),
       handler: async (args: HandlerArgs) => {
@@ -390,7 +390,7 @@ export function createToolHandlers(client: SymconClient): Record<string, { descr
               type: 'text',
               text:
                 JSON.stringify(snapshot, null, 2) +
-                '\n\nHinweis: Diesen Snapshot (als JSON-Array) bei symcon_diff_variables als previousSnapshotJson übergeben, nachdem der User eine Aktion ausgeführt hat.',
+                '\n\nHinweis: Sage dem User: „Schalte das Gerät jetzt ein oder aus – egal welche Richtung –, und sag Bescheid, wenn du fertig bist.“ Danach symcon_diff_variables(previousSnapshotJson) mit diesem Snapshot aufrufen.',
             },
           ],
         };
