@@ -6,6 +6,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { getKnowledgeStore } from '../knowledge/KnowledgeStore.js';
+import { getAutomationStore } from '../knowledge/AutomationStore.js';
 import { z } from 'zod';
 const variableIdSchema = z.object({ variableId: z.number().int().positive() });
 const objectIdSchema = z.object({ objectId: z.number().int().positive() });
@@ -16,6 +17,8 @@ const setValueSchema = z.object({
     variableId: z.number().int().positive(),
     value: z.union([z.string(), z.number(), z.boolean()]),
 });
+/** Root-Name für MCP-Automationen im Objektbaum (Ordnerkonvention: Thema, optional Raum). */
+const MCP_AUTOMATIONS_ROOT = 'MCP Automations';
 function getArgs(args) {
     return args;
 }
@@ -469,6 +472,261 @@ export function createToolHandlers(client) {
                         },
                     ],
                 };
+            },
+        },
+        // --- Automationen: Ordner, Timer, Skripte, Events, Registry ---
+        symcon_automation_get_or_create_folder: {
+            description: 'Erstellt oder liefert die Kategorie-Pfadkette für MCP-Automationen. Ordnerkonvention: Root „MCP Automations“, darunter Themen (Timer, Beleuchtung, Rollladen, Ambiente, Sonstige), optional zweite Ebene Raum (z. B. Büro). Gibt rootCategoryId, categoryId und path zurück.',
+            inputSchema: z.object({
+                categoryPath: z
+                    .array(z.string())
+                    .describe('z. B. ["MCP Automations", "Timer"] oder ["MCP Automations", "Beleuchtung", "Büro"]'),
+            }),
+            handler: async (args) => {
+                const { categoryPath } = getArgs(args);
+                const path = categoryPath.map((s) => s.trim()).filter(Boolean);
+                if (path.length === 0) {
+                    return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: 'categoryPath darf nicht leer sein.' }) }] };
+                }
+                const fullPath = path[0] === MCP_AUTOMATIONS_ROOT ? path : [MCP_AUTOMATIONS_ROOT, ...path];
+                const categoryId = await client.getOrCreateCategoryPath(0, fullPath);
+                const rootId = fullPath.length > 1 ? await client.getOrCreateCategoryPath(0, [fullPath[0]]) : categoryId;
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: JSON.stringify({ ok: true, rootCategoryId: rootId, categoryId, path: fullPath }),
+                        },
+                    ],
+                };
+            },
+        },
+        symcon_schedule_once: {
+            description: 'Legt eine einmalige zeitverzögerte Aktion an (z. B. „Rolllade in 10 Minuten auf“). Erstellt Skript (RequestAction) und zyklisches Event „once“ mit Zeitgrenze jetzt + Verzögerung, ordnet unter categoryPath ein (Default: MCP Automations/Timer), speichert in der Automation-Registry mit theme „Timer“. value: true/„auf“/„ein“ = an, false/„zu“/„aus“ = aus.',
+            inputSchema: z.object({
+                variableId: z.number().int().positive(),
+                value: z.union([z.string(), z.number(), z.boolean()]).describe('true/auf/ein = an, false/zu/aus = aus'),
+                delayMinutes: z.number().int().min(0).optional().describe('Verzögerung in Minuten (Standard 0)'),
+                delaySeconds: z.number().int().min(0).optional().describe('Verzögerung in Sekunden (wenn delayMinutes 0)'),
+                label: z.string().optional().describe('Lesbares Label für Registry, z. B. „Rolllade 10min“'),
+                categoryPath: z.array(z.string()).optional().describe('Default: [\"MCP Automations\", \"Timer\"]'),
+            }),
+            handler: async (args) => {
+                const { variableId, value, delayMinutes = 0, delaySeconds = 0, label: labelArg, categoryPath: categoryPathArg, } = getArgs(args);
+                const delayTotalSeconds = delayMinutes * 60 + delaySeconds;
+                if (delayTotalSeconds <= 0) {
+                    return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: 'delayMinutes oder delaySeconds > 0 angeben.' }) }] };
+                }
+                const path = (categoryPathArg && categoryPathArg.length > 0 ? categoryPathArg : [MCP_AUTOMATIONS_ROOT, 'Timer']).map((s) => s.trim()).filter(Boolean);
+                const fullPath = path[0] === MCP_AUTOMATIONS_ROOT ? path : [MCP_AUTOMATIONS_ROOT, ...path];
+                const categoryId = await client.getOrCreateCategoryPath(0, fullPath);
+                const actionValue = typeof value === 'string' ? (value.toLowerCase() === 'aus' || value.toLowerCase() === 'zu' || value.toLowerCase() === 'off' ? false : true) : Boolean(value);
+                const scriptId = await client.createScript(0);
+                const scriptContent = `<?php\nRequestAction(${variableId}, ${actionValue ? 'true' : 'false'});\n`;
+                await client.setScriptContent(scriptId, scriptContent);
+                const scriptName = labelArg?.trim() || `Timer ${variableId} in ${delayTotalSeconds}s`;
+                await client.setName(scriptId, scriptName);
+                await client.setParent(scriptId, categoryId);
+                const eventId = await client.createEvent(1);
+                const runScriptCode = `IPS_RunScript(${scriptId});`;
+                await client.setEventScript(eventId, runScriptCode);
+                const now = Math.floor(Date.now() / 1000);
+                const targetTs = now + delayTotalSeconds;
+                await client.setEventCyclic(eventId, 1, 0, 0, 0, 0, 0);
+                await client.setEventCyclicDateBounds(eventId, targetTs, targetTs);
+                await client.setEventCyclicTimeBounds(eventId, targetTs, 0);
+                await client.setEventActive(eventId, true);
+                await client.setName(eventId, scriptName + ' (Event)');
+                await client.setParent(eventId, categoryId);
+                const store = getAutomationStore();
+                const entry = await store.addOrUpdate({
+                    label: labelArg?.trim() || `Timer ${variableId} ${delayTotalSeconds}s`,
+                    categoryPath: fullPath,
+                    scriptId,
+                    eventIds: [eventId],
+                    theme: 'Timer',
+                });
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: JSON.stringify({
+                                ok: true,
+                                scriptId,
+                                eventId,
+                                categoryId,
+                                categoryPath: fullPath,
+                                runsAtUnix: targetTs,
+                                automationId: entry.automationId,
+                            }),
+                        },
+                    ],
+                };
+            },
+        },
+        symcon_script_create: {
+            description: 'Erstellt ein PHP-Skript in Symcon, setzt Inhalt und Namen, ordnet es unter der angegebenen Kategorie ein. categoryPath: z. B. ["MCP Automations", "Ambiente"]; parentCategoryId kann stattdessen verwendet werden.',
+            inputSchema: z.object({
+                name: z.string(),
+                content: z.string().describe('PHP-Code inkl. <?php ... ?>'),
+                categoryPath: z.array(z.string()).optional(),
+                parentCategoryId: z.number().int().min(0).optional().describe('Objekt-ID der übergeordneten Kategorie (Alternative zu categoryPath)'),
+            }),
+            handler: async (args) => {
+                const { name, content, categoryPath: categoryPathArg, parentCategoryId } = getArgs(args);
+                let categoryId;
+                if (parentCategoryId !== undefined && parentCategoryId > 0) {
+                    categoryId = parentCategoryId;
+                }
+                else {
+                    const path = (categoryPathArg && categoryPathArg.length > 0 ? categoryPathArg : [MCP_AUTOMATIONS_ROOT, 'Sonstige']).map((s) => s.trim()).filter(Boolean);
+                    const fullPath = path[0] === MCP_AUTOMATIONS_ROOT ? path : [MCP_AUTOMATIONS_ROOT, ...path];
+                    categoryId = await client.getOrCreateCategoryPath(0, fullPath);
+                }
+                const scriptId = await client.createScript(0);
+                await client.setScriptContent(scriptId, content);
+                await client.setName(scriptId, name.trim());
+                await client.setParent(scriptId, categoryId);
+                return { content: [{ type: 'text', text: JSON.stringify({ ok: true, scriptId, categoryId }) }] };
+            },
+        },
+        symcon_script_set_content: {
+            description: 'Aktualisiert den Inhalt eines Symcon-Skripts (IPS_SetScriptContent).',
+            inputSchema: z.object({ scriptId: z.number().int().positive(), content: z.string() }),
+            handler: async (args) => {
+                const { scriptId, content } = getArgs(args);
+                await client.setScriptContent(scriptId, content);
+                return { content: [{ type: 'text', text: JSON.stringify({ ok: true }) }] };
+            },
+        },
+        symcon_script_delete: {
+            description: 'Löscht ein Symcon-Skript (IPS_DeleteScript). Vorher zugehörige Events löschen oder trennen.',
+            inputSchema: scriptIdSchema,
+            handler: async (args) => {
+                const { scriptId } = getArgs(args);
+                await client.deleteScript(scriptId);
+                return { content: [{ type: 'text', text: JSON.stringify({ ok: true }) }] };
+            },
+        },
+        symcon_event_create_cyclic: {
+            description: 'Erstellt ein zyklisches Event in Symcon, verknüpft es mit einem Skript (IPS_RunScript) und ordnet es unter categoryPath ein. dateType: 0=kein Datum, 1=einmalig (DateBounds), 2=täglich, 3=wöchentlich, 4=monatlich, 5=jährlich. timeType: 0=einmalig (TimeBounds), 1=jede Sekunde, 2=jede Minute, 3=stündlich. timeFrom/timeTo: Unix-Zeit (Sekunden) für Zeitgrenzen, z. B. mktime(7,0,0) für 07:00.',
+            inputSchema: z.object({
+                scriptId: z.number().int().positive(),
+                categoryPath: z.array(z.string()).optional(),
+                parentCategoryId: z.number().int().min(0).optional(),
+                dateType: z.number().int().min(0).max(5).optional().describe('0–5, 1=once'),
+                dateInterval: z.number().int().min(0).optional(),
+                dateDay: z.number().int().min(0).optional(),
+                dateDayInterval: z.number().int().min(0).optional(),
+                timeType: z.number().int().min(0).max(3).optional().describe('0=once, 1=sec, 2=min, 3=hour'),
+                timeInterval: z.number().int().min(0).optional(),
+                timeFrom: z.number().int().min(0).optional().describe('Unix-Zeit Start'),
+                timeTo: z.number().int().min(0).optional().describe('Unix-Zeit Ende'),
+                dateFrom: z.number().int().min(0).optional(),
+                dateTo: z.number().int().min(0).optional(),
+                name: z.string().optional(),
+            }),
+            handler: async (args) => {
+                const params = getArgs(args);
+                let categoryId;
+                if (params.parentCategoryId !== undefined && params.parentCategoryId > 0) {
+                    categoryId = params.parentCategoryId;
+                }
+                else {
+                    const path = (params.categoryPath && params.categoryPath.length > 0 ? params.categoryPath : [MCP_AUTOMATIONS_ROOT, 'Sonstige']).map((s) => s.trim()).filter(Boolean);
+                    const fullPath = path[0] === MCP_AUTOMATIONS_ROOT ? path : [MCP_AUTOMATIONS_ROOT, ...path];
+                    categoryId = await client.getOrCreateCategoryPath(0, fullPath);
+                }
+                const eventId = await client.createEvent(1);
+                const runScriptCode = `IPS_RunScript(${params.scriptId});`;
+                await client.setEventScript(eventId, runScriptCode);
+                const dateType = params.dateType ?? 0;
+                const dateInterval = params.dateInterval ?? 0;
+                const dateDay = params.dateDay ?? 0;
+                const dateDayInterval = params.dateDayInterval ?? 0;
+                const timeType = params.timeType ?? 0;
+                const timeInterval = params.timeInterval ?? 0;
+                await client.setEventCyclic(eventId, dateType, dateInterval, dateDay, dateDayInterval, timeType, timeInterval);
+                if (params.timeFrom !== undefined || params.timeTo !== undefined) {
+                    await client.setEventCyclicTimeBounds(eventId, params.timeFrom ?? 0, params.timeTo ?? 0);
+                }
+                if (params.dateFrom !== undefined || params.dateTo !== undefined) {
+                    await client.setEventCyclicDateBounds(eventId, params.dateFrom ?? 0, params.dateTo ?? 0);
+                }
+                await client.setEventActive(eventId, true);
+                if (params.name)
+                    await client.setName(eventId, params.name);
+                await client.setParent(eventId, categoryId);
+                return {
+                    content: [{ type: 'text', text: JSON.stringify({ ok: true, eventId, categoryId }) }],
+                };
+            },
+        },
+        symcon_event_delete: {
+            description: 'Löscht ein Symcon-Event (IPS_DeleteEvent).',
+            inputSchema: z.object({ eventId: z.number().int().positive() }),
+            handler: async (args) => {
+                const { eventId } = getArgs(args);
+                await client.deleteEvent(eventId);
+                return { content: [{ type: 'text', text: JSON.stringify({ ok: true }) }] };
+            },
+        },
+        symcon_event_get: {
+            description: 'Liefert Infos zu einem Symcon-Event (IPS_GetEvent).',
+            inputSchema: z.object({ eventId: z.number().int().positive() }),
+            handler: async (args) => {
+                const { eventId } = getArgs(args);
+                const ev = await client.getEvent(eventId);
+                return { content: [{ type: 'text', text: JSON.stringify(ev, null, 2) }] };
+            },
+        },
+        symcon_automation_list: {
+            description: 'Listet MCP-Automationen aus der Registry. Optional Filter: theme (z. B. Timer, Ambiente), room, categoryPath. Ohne Filter: alle Einträge. Die KI soll vor dem Anlegen neuer Automationen prüfen, ob bereits ein Eintrag existiert (z. B. „Ambiente-Licht Zeiten“), und dann aktualisieren statt Duplikate anlegen.',
+            inputSchema: z.object({
+                theme: z.string().optional(),
+                room: z.string().optional(),
+                categoryPath: z.array(z.string()).optional(),
+            }),
+            handler: async (args) => {
+                const { theme, room, categoryPath } = getArgs(args);
+                const store = getAutomationStore();
+                let list = await store.getAll();
+                if (theme)
+                    list = list.filter((a) => a.theme && a.theme.toLowerCase() === theme.trim().toLowerCase());
+                if (room)
+                    list = list.filter((a) => a.room && a.room.toLowerCase() === room.trim().toLowerCase());
+                if (categoryPath && categoryPath.length > 0) {
+                    const norm = categoryPath.map((s) => s.trim().toLowerCase()).filter(Boolean);
+                    list = list.filter((a) => a.categoryPath.length >= norm.length && a.categoryPath.slice(0, norm.length).every((p, i) => p.toLowerCase() === norm[i]));
+                }
+                return { content: [{ type: 'text', text: JSON.stringify({ automations: list }, null, 2) }] };
+            },
+        },
+        symcon_automation_register: {
+            description: 'Speichert oder aktualisiert einen Eintrag in der Automation-Registry (label, categoryPath, scriptId, eventIds, optional room, theme). Wird intern von schedule_once etc. genutzt; KI kann es explizit aufrufen, um eine Automation zu registrieren.',
+            inputSchema: z.object({
+                label: z.string(),
+                categoryPath: z.array(z.string()),
+                scriptId: z.number().int().positive(),
+                eventIds: z.array(z.number().int().positive()).optional(),
+                room: z.string().optional(),
+                theme: z.string().optional(),
+            }),
+            handler: async (args) => {
+                const { label, categoryPath, scriptId, eventIds, room, theme } = getArgs(args);
+                const store = getAutomationStore();
+                const entry = await store.addOrUpdate({ label, categoryPath, scriptId, eventIds: eventIds ?? [], room, theme });
+                return { content: [{ type: 'text', text: JSON.stringify({ ok: true, automationId: entry.automationId, entry }) }] };
+            },
+        },
+        symcon_automation_unregister: {
+            description: 'Entfernt einen Eintrag aus der Automation-Registry (anhand automationId). Skript/Events werden nicht gelöscht – dazu symcon_script_delete / symcon_event_delete nutzen.',
+            inputSchema: z.object({ automationId: z.string() }),
+            handler: async (args) => {
+                const { automationId } = getArgs(args);
+                const store = getAutomationStore();
+                const removed = await store.remove(automationId);
+                return { content: [{ type: 'text', text: JSON.stringify({ ok: removed, automationId }) }] };
             },
         },
     };

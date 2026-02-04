@@ -71,6 +71,22 @@ export class SymconClient {
             IPS_RunScript: ['ScriptID'],
             IPS_GetVariable: ['VariableID'],
             IPS_GetObjectIDByName: ['Name', 'ParentID'],
+            IPS_CreateCategory: [],
+            IPS_SetName: ['ObjectID', 'Name'],
+            IPS_SetParent: ['ObjectID', 'ParentID'],
+            IPS_CreateScript: ['ScriptType'],
+            IPS_SetScriptContent: ['ScriptID', 'Content'],
+            IPS_GetScriptContent: ['ScriptID'],
+            IPS_DeleteScript: ['ScriptID'],
+            IPS_GetScriptIDByName: ['ScriptName', 'ParentID'],
+            IPS_CreateEvent: ['EventType'],
+            IPS_SetEventCyclic: ['EventID', 'DateType', 'DateInterval', 'DateDay', 'DateDayInterval', 'TimeType', 'TimeInterval'],
+            IPS_SetEventCyclicDateBounds: ['EventID', 'FromDate', 'ToDate'],
+            IPS_SetEventCyclicTimeBounds: ['EventID', 'FromTime', 'ToTime'],
+            IPS_SetEventScript: ['EventID', 'EventScript'],
+            IPS_SetEventActive: ['EventID', 'Active'],
+            IPS_DeleteEvent: ['EventID'],
+            IPS_GetEvent: ['EventID'],
         };
         const keys = order[method] ?? Object.keys(params);
         return keys.map((k) => params[k]);
@@ -98,5 +114,92 @@ export class SymconClient {
     }
     async getVariable(variableId) {
         return this.call('IPS_GetVariable', [variableId]);
+    }
+    // --- Objektverwaltung (Kategorien, Namen, Parent) ---
+    async createCategory() {
+        return this.call('IPS_CreateCategory', []);
+    }
+    async setName(objectId, name) {
+        return this.call('IPS_SetName', [objectId, name]);
+    }
+    async setParent(objectId, parentId) {
+        return this.call('IPS_SetParent', [objectId, parentId]);
+    }
+    // --- Skripte ---
+    async createScript(scriptType) {
+        return this.call('IPS_CreateScript', [scriptType]);
+    }
+    async setScriptContent(scriptId, content) {
+        return this.call('IPS_SetScriptContent', [scriptId, content]);
+    }
+    async getScriptContent(scriptId) {
+        return this.call('IPS_GetScriptContent', [scriptId]);
+    }
+    async deleteScript(scriptId) {
+        return this.call('IPS_DeleteScript', [scriptId]);
+    }
+    async getScriptIdByName(scriptName, parentId) {
+        return this.call('IPS_GetScriptIDByName', [scriptName, parentId]);
+    }
+    // --- Events (zyklisch / einmalig) ---
+    async createEvent(eventType) {
+        return this.call('IPS_CreateEvent', [eventType]);
+    }
+    async setEventCyclic(eventId, dateType, dateInterval, dateDay, dateDayInterval, timeType, timeInterval) {
+        return this.call('IPS_SetEventCyclic', [
+            eventId,
+            dateType,
+            dateInterval,
+            dateDay,
+            dateDayInterval,
+            timeType,
+            timeInterval,
+        ]);
+    }
+    async setEventCyclicDateBounds(eventId, fromDate, toDate) {
+        return this.call('IPS_SetEventCyclicDateBounds', [eventId, fromDate, toDate]);
+    }
+    async setEventCyclicTimeBounds(eventId, fromTime, toTime) {
+        return this.call('IPS_SetEventCyclicTimeBounds', [eventId, fromTime, toTime]);
+    }
+    async setEventScript(eventId, eventScript) {
+        return this.call('IPS_SetEventScript', [eventId, eventScript]);
+    }
+    async setEventActive(eventId, active) {
+        return this.call('IPS_SetEventActive', [eventId, active]);
+    }
+    async deleteEvent(eventId) {
+        return this.call('IPS_DeleteEvent', [eventId]);
+    }
+    async getEvent(eventId) {
+        return this.call('IPS_GetEvent', [eventId]);
+    }
+    /**
+     * Erstellt die Kategorie-Pfadkette unter parentId. Für jedes Segment: existiert bereits eine
+     * Kategorie mit diesem Namen unter dem aktuellen Parent, wird deren ID genutzt; sonst wird
+     * eine neue Kategorie erstellt, benannt und als Kind zugeordnet.
+     * @returns ObjectID der letzten Kategorie im Pfad (dort können Skripte/Events abgelegt werden).
+     */
+    async getOrCreateCategoryPath(parentId, pathSegments) {
+        let currentParentId = parentId;
+        for (const segment of pathSegments) {
+            if (!segment.trim())
+                continue;
+            try {
+                const existingId = await this.getObjectIdByName(segment.trim(), currentParentId);
+                if (existingId && existingId > 0) {
+                    currentParentId = existingId;
+                    continue;
+                }
+            }
+            catch {
+                // Objekt mit diesem Namen existiert nicht → Kategorie anlegen
+            }
+            const catId = await this.createCategory();
+            await this.setName(catId, segment.trim());
+            await this.setParent(catId, currentParentId);
+            currentParentId = catId;
+        }
+        return currentParentId;
     }
 }

@@ -60,6 +60,7 @@ Die Symcon-API bleibt auf dem Gerät, auf dem Symcon läuft (SymBox/PC); der MCP
 - `symcon_knowledge_set` / `symcon_knowledge_get` – Geräte-Zuordnungen speichern/lesen (Sprachsteuerung)
 - `symcon_snapshot_variables` – Snapshot aller Variablenwerte unter einer Wurzel (rootId, maxDepth)
 - `symcon_diff_variables` – Aktuellen Zustand mit Snapshot vergleichen (variableId, oldValue, newValue)
+- **Automationen:** `symcon_automation_get_or_create_folder`, `symcon_schedule_once` (einmaliger Timer), `symcon_script_create` / `symcon_script_set_content` / `symcon_script_delete`, `symcon_event_create_cyclic` / `symcon_event_delete` / `symcon_event_get`, `symcon_automation_list` / `symcon_automation_register` / `symcon_automation_unregister` – Skripte und zeitgesteuerte Events unter themen- und raumbezogenen Ordnern (MCP Automations/Timer, Beleuchtung, Ambiente, …). Keine Duplikate: Registry nutzen und vorhandene Automationen aktualisieren. Siehe [docs/AUTOMATIONEN.md](docs/AUTOMATIONEN.md).
 
 ### Fall: Gerät per Vorher/Nachher zuordnen (Snapshot/Diff)
 
@@ -79,4 +80,4 @@ Ein MCP-Client (z. B. ein KI-fähiger Editor oder ein eigener KI-Assistent) ve
 - [docs/STEUERUNG_HINWEISE.md](docs/STEUERUNG_HINWEISE.md) – Steuerungshinweise für KI und MCP-Clients (z. B. Hue: RequestAction für Ein/Aus und Helligkeit, Skala 0–254).
 - [docs/CLAUDE_EINBINDEN.md](docs/CLAUDE_EINBINDEN.md) – Claude/.mcpb-Einbindung.
 - [docs/MODULREFERENZ.md](docs/MODULREFERENZ.md) – Modulreferenz (Geräte) von Symcon.
-- [docs/AUTOMATION_ORDNERSTRUKTUR.md](docs/AUTOMATION_ORDNERSTRUKTUR.md) – Ordnerlogik für MCP-Automationen (Skripte/Events: thematisch und optional nach Räumen).
+- [docs/AUTOMATIONEN.md](docs/AUTOMATIONEN.md) – Automationen: Skripte, Timer, zyklische Events, Ordnerstruktur (MCP Automations/Thema/Raum), Registry, keine Duplikate.

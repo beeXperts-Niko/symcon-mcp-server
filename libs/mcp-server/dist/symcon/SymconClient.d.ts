@@ -40,4 +40,27 @@ export declare class SymconClient {
     runScript(scriptId: number): Promise<unknown>;
     getObjectIdByName(name: string, parentId?: number): Promise<number>;
     getVariable(variableId: number): Promise<unknown>;
+    createCategory(): Promise<number>;
+    setName(objectId: number, name: string): Promise<boolean>;
+    setParent(objectId: number, parentId: number): Promise<boolean>;
+    createScript(scriptType: number): Promise<number>;
+    setScriptContent(scriptId: number, content: string): Promise<boolean>;
+    getScriptContent(scriptId: number): Promise<string>;
+    deleteScript(scriptId: number): Promise<boolean>;
+    getScriptIdByName(scriptName: string, parentId: number): Promise<number>;
+    createEvent(eventType: number): Promise<number>;
+    setEventCyclic(eventId: number, dateType: number, dateInterval: number, dateDay: number, dateDayInterval: number, timeType: number, timeInterval: number): Promise<boolean>;
+    setEventCyclicDateBounds(eventId: number, fromDate: number, toDate: number): Promise<boolean>;
+    setEventCyclicTimeBounds(eventId: number, fromTime: number, toTime: number): Promise<boolean>;
+    setEventScript(eventId: number, eventScript: string): Promise<boolean>;
+    setEventActive(eventId: number, active: boolean): Promise<boolean>;
+    deleteEvent(eventId: number): Promise<boolean>;
+    getEvent(eventId: number): Promise<unknown>;
+    /**
+     * Erstellt die Kategorie-Pfadkette unter parentId. Für jedes Segment: existiert bereits eine
+     * Kategorie mit diesem Namen unter dem aktuellen Parent, wird deren ID genutzt; sonst wird
+     * eine neue Kategorie erstellt, benannt und als Kind zugeordnet.
+     * @returns ObjectID der letzten Kategorie im Pfad (dort können Skripte/Events abgelegt werden).
+     */
+    getOrCreateCategoryPath(parentId: number, pathSegments: string[]): Promise<number>;
 }
