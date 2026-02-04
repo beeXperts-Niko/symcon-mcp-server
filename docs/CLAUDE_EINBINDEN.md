@@ -138,3 +138,25 @@ Immer interaktiv:
 - **MCP-Server muss laufen**, bevor Claude sich verbindet (localhost:4096 oder SymBox:4096).
 - Bei **lokalem Server** (start-mcp-local.sh): Symcon-API (z. B. SymBox) muss vom Mac aus erreichbar sein; Passwort wird beim Start abgefragt.
 - Die **Wissensbasis** (gelernte Geräte) liegt im MCP-Server (z. B. `data/symcon-knowledge.json`) und bleibt erhalten – auch in neuen Claude-Chats, solange derselbe MCP-Server läuft.
+
+---
+
+## 5. Fehlerbehebung: „Server disconnected“
+
+Wenn Claude die Meldung **„Server disconnected“** oder **„Server transport closed unexpectedly“** anzeigt:
+
+1. **Symcon MCP-Server zuerst starten**  
+   In einem Terminal:
+   ```bash
+   cd symcon-mcp-server
+   ./start-mcp-local.sh
+   ```
+   Warte, bis der Server läuft (z. B. „Listening on http://0.0.0.0:4096“). **Erst danach** Claude Desktop starten bzw. die Erweiterung nutzen.
+
+2. **URL in der Erweiterung prüfen**  
+   Unter Erweiterungen → Symcon Smart Home → **Konfigurieren**: Die **Symcon MCP-Server URL** muss exakt der Adresse entsprechen, unter der der Server läuft (z. B. `http://127.0.0.1:4096`). Kein Slash am Ende.
+
+3. **Im Claude-Log nachsehen**  
+   In den Entwickler-Logs von Claude solltest du u. a. sehen:  
+   `[Symcon MCPB] Connecting to Symcon MCP server at http://127.0.0.1:4096 …`  
+   Erscheint danach `Adapter exited with code …`, ist der Symcon MCP-Server unter dieser URL nicht erreichbar (nicht gestartet oder falsche URL).
