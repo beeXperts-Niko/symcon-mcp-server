@@ -60,7 +60,7 @@ Die Symcon-API bleibt auf dem Gerät, auf dem Symcon läuft (SymBox/PC); der MCP
 - `symcon_knowledge_set` / `symcon_knowledge_get` – Geräte-Zuordnungen speichern/lesen (Sprachsteuerung)
 - `symcon_snapshot_variables` – Snapshot aller Variablenwerte unter einer Wurzel (rootId, maxDepth)
 - `symcon_diff_variables` – Aktuellen Zustand mit Snapshot vergleichen (variableId, oldValue, newValue)
-- **Automationen:** `symcon_automation_get_or_create_folder`, `symcon_schedule_once` (einmaliger Timer; Fallback: festes Control-Skript „MCP Delayed Action Control“ mit Parameterübergabe und Selbstlöschung der temporären Skripte), `symcon_script_create` / `symcon_script_set_content` / `symcon_script_delete`, `symcon_event_create_cyclic` / … – Skripte und zeitgesteuerte Events unter MCP Automations/Thema/Raum. Siehe [docs/AUTOMATIONEN.md](docs/AUTOMATIONEN.md).
+- **Automationen:** `symcon_automation_get_or_create_folder`, `symcon_schedule_once` (einmaliger Timer; Fallback: festes Control-Skript „MCP Delayed Action Control“ mit Queue **„MCP Timer Queue“** + Dispatcher-Event (jede Sekunde), Enqueue per RunScriptEx/RunScriptText), `symcon_script_create` / `symcon_script_set_content` / `symcon_script_delete`, `symcon_event_create_cyclic` / … – Skripte und zeitgesteuerte Events unter MCP Automations/Thema/Raum. Siehe [docs/AUTOMATIONEN.md](docs/AUTOMATIONEN.md).
 
 ### Fall: Gerät per Vorher/Nachher zuordnen (Snapshot/Diff)
 

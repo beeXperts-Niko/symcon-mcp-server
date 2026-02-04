@@ -628,7 +628,7 @@ export function createToolHandlers(client) {
             },
         },
         symcon_schedule_once: {
-            description: 'Legt eine einmalige zeitverzögerte Aktion an (z. B. „Licht in 1 Minute an“). Nutzt wenn möglich die Symcon-Timer-API (IPS_SetEventCyclicDateBounds). Fallback: ein Skript pro Timer mit Sleep bis Zielzeit, dann RequestAction, dann Event und Skript selbst löschen (IPS_DeleteEvent, sleep, RequestAction, IPS_DeleteScript).',
+            description: 'Legt eine einmalige zeitverzögerte Aktion an (z. B. „Licht in 1 Minute an“). Nutzt wenn möglich die Symcon-Timer-API (IPS_SetEventCyclicDateBounds/TimeBounds). Fallback: permanentes Control-Skript „MCP Delayed Action Control“ mit Queue „MCP Timer Queue“ + Dispatcher-Event (jede Sekunde); Enqueue per IPS_RunScriptEx, wenn nötig per IPS_RunScriptText (Semaphore/atomar).',
             inputSchema: z.object({
                 variableId: z.number().int().positive(),
                 value: z.union([z.string(), z.number(), z.boolean()]).describe('true/auf/ein = an, false/zu/aus = aus'),
@@ -684,22 +684,55 @@ export function createToolHandlers(client) {
                     return { ok: true, scriptId, eventId, categoryId, categoryPath: fullPath, runsAtUnix: targetTs, automationId: entry.automationId };
                 };
                 const runControlScriptFallback = async () => {
+                    // Stellt Queue + Dispatcher-Event unter MCP Automations/Timer sicher
                     const controlScriptId = await client.getOrCreateDelayedActionControlScript();
                     const payload = { VariableID: variableId, Value: valueForAction, DelaySeconds: delayTotalSeconds };
                     try {
+                        // Bevorzugt: Parameterübergabe ohne Shared-State
                         await client.runScriptEx(controlScriptId, payload);
                     }
                     catch {
-                        // RunScriptEx nicht verfügbar (z. B. Parameter count mismatch) → Parameter per Variable übergeben
-                        const paramsVarId = await client.getObjectIdByName('MCP Timer Params', categoryId);
-                        await client.setValue(paramsVarId, JSON.stringify(payload));
-                        await client.runScript(controlScriptId);
+                        // Fallback: atomar in Queue schreiben (Semaphore) via IPS_RunScriptText
+                        const timerCategoryId = await client.getOrCreateCategoryPath(0, [MCP_AUTOMATIONS_ROOT, 'Timer']);
+                        const valuePhp = typeof valueForAction === 'boolean'
+                            ? valueForAction
+                                ? 'true'
+                                : 'false'
+                            : typeof valueForAction === 'number'
+                                ? Number.isFinite(valueForAction)
+                                    ? String(valueForAction)
+                                    : '0'
+                                : JSON.stringify(String(valueForAction));
+                        const scriptText = `<?php
+$catId = ${timerCategoryId};
+$queueVarId = @IPS_GetObjectIDByName("MCP Timer Queue", $catId);
+if (!$queueVarId) {
+    $queueVarId = IPS_CreateVariable(3);
+    IPS_SetName($queueVarId, "MCP Timer Queue");
+    IPS_SetParent($queueVarId, $catId);
+    SetValue($queueVarId, "[]");
+}
+$now = time();
+$runAt = $now + ${delayTotalSeconds};
+$variableId = ${variableId};
+$value = ${valuePhp};
+if (IPS_SemaphoreEnter("MCP_TIMER_QUEUE", 2000)) {
+    $raw = (string)GetValue($queueVarId);
+    if ($raw === "") $raw = "[]";
+    $q = json_decode($raw, true);
+    if (!is_array($q)) $q = [];
+    $q[] = ["runAt" => $runAt, "variableId" => $variableId, "value" => $value];
+    SetValue($queueVarId, json_encode(array_values($q), JSON_UNESCAPED_UNICODE));
+    IPS_SemaphoreLeave("MCP_TIMER_QUEUE");
+}
+?>`;
+                        await client.runScriptText(scriptText);
                     }
                     return {
                         ok: true,
                         controlScript: true,
                         runsAtUnix: targetTs,
-                        hint: 'Nur ein Control-Skript (MCP Delayed Action Control): erzeugt einmaliges Skript (sleep → RequestAction → IPS_DeleteScript(self, true)) und startet es asynchron. Keine weiteren Skripte anlegen.',
+                        hint: 'Fallback: MCP Delayed Action Control nutzt eine Queue (MCP Timer Queue) + Dispatcher-Event (jede Sekunde). Mehrere gleichzeitige Timer sind dadurch zuverlässig.',
                     };
                 };
                 try {

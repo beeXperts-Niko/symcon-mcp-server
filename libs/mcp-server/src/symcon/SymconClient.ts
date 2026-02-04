@@ -83,6 +83,7 @@ export class SymconClient {
       IPS_GetChildrenIDs: ['ParentID'],
       IPS_RunScript: ['ScriptID'],
       IPS_RunScriptEx: ['ScriptID', 'Parameters'],
+      IPS_RunScriptText: ['ScriptText'],
       IPS_GetVariable: ['VariableID'],
       IPS_GetObjectIDByName: ['Name', 'ParentID'],
       IPS_CreateCategory: [],
@@ -113,13 +114,14 @@ export class SymconClient {
 
   /**
    * Normalisiert den Wert für SetValue/RequestAction.
-   * Symcon erwartet bei Float-Variablen (z. B. Level ~Intensity.1) einen passenden Typ;
-   * über JSON-RPC werden ganze Zahlen als Integer übergeben, was zu "Parameter type of Value does not match" führt.
-   * Zahlen werden daher als String gesendet, damit Symcon sie in den Variablentyp konvertieren kann.
+   * Symcon prüft den Typ streng: Float-Variablen (z. B. Level ~Intensity.1) erwarten Float;
+   * über JSON-RPC wird 0 als Integer geliefert → "Parameter type of Value does not match".
+   * Wir senden Zahlen als Dezimal-String (z. B. "0.0", "100.0"), damit PHP (float)"0.0" nutzen kann.
    */
   private normalizeValue(value: unknown): unknown {
     if (typeof value === 'number' && Number.isFinite(value)) {
-      return String(value);
+      const s = String(value);
+      return s.includes('.') ? s : `${s}.0`;
     }
     return value;
   }
@@ -150,6 +152,11 @@ export class SymconClient {
    */
   async runScriptEx(scriptId: number, params: Record<string, unknown>): Promise<unknown> {
     return this.call('IPS_RunScriptEx', [scriptId, params]);
+  }
+
+  /** Führt PHP-Text direkt aus (asynchron). */
+  async runScriptText(scriptText: string): Promise<unknown> {
+    return this.call('IPS_RunScriptText', [scriptText]);
   }
 
   async getObjectIdByName(name: string, parentId: number = 0): Promise<number> {
@@ -250,61 +257,134 @@ export class SymconClient {
 
   /** Name des MCP-Control-Skripts für verzögerte Aktionen (Timer). Wird unter MCP Automations/Timer angelegt. */
   static readonly MCP_DELAYED_ACTION_CONTROL_SCRIPT_NAME = 'MCP Delayed Action Control';
+  static readonly MCP_TIMER_QUEUE_VAR_NAME = 'MCP Timer Queue';
+  static readonly MCP_TIMER_DISPATCH_EVENT_NAME = 'MCP Timer Dispatcher';
 
   /**
    * Erstellt oder liefert die Script-ID des MCP Control-Skripts für verzögerte Aktionen.
-   * Das Skript erwartet per IPS_RunScriptEx: VariableID, Value, DelaySeconds.
-   * Es erzeugt ein einmaliges Skript (sleep → RequestAction → IPS_DeleteScript(self, true)) und startet es asynchron.
+   * Das Skript verwaltet eine Timer-Queue (Variable `MCP Timer Queue`) und wird zyklisch (alle 10s)
+   * durch ein Event aufgerufen. Enqueue erfolgt per IPS_RunScriptEx(VariableID, Value, DelaySeconds).
    */
   async getOrCreateDelayedActionControlScript(): Promise<number> {
     const path = ['MCP Automations', 'Timer'];
     const categoryId = await this.getOrCreateCategoryPath(0, path);
+
+    // Queue-Variable sicherstellen
+    let queueVarId: number;
+    try {
+      queueVarId = await this.getObjectIdByName(SymconClient.MCP_TIMER_QUEUE_VAR_NAME, categoryId);
+    } catch {
+      queueVarId = await this.createVariable(3);
+      await this.setName(queueVarId, SymconClient.MCP_TIMER_QUEUE_VAR_NAME);
+      await this.setParent(queueVarId, categoryId);
+      await this.setValue(queueVarId, '[]');
+    }
+
     const content = `<?php
-// Einziges Control-Skript für verzögerte Aktionen. Aufruf per IPS_RunScriptEx (VariableID, Value, DelaySeconds) ODER per Variable "MCP Timer Params" (JSON).
-\$variableId = isset(\$_IPS['VariableID']) ? (int)\$_IPS['VariableID'] : 0;
-\$value = isset(\$_IPS['Value']) ? \$_IPS['Value'] : false;
-\$delaySeconds = isset(\$_IPS['DelaySeconds']) ? (int)\$_IPS['DelaySeconds'] : 0;
-if (\$variableId <= 0 || \$delaySeconds <= 0) {
-    \$catId = IPS_GetParent(\$_IPS['SELF']);
-    \$varId = @IPS_GetObjectIDByName("MCP Timer Params", \$catId);
-    if (!\$varId) { \$varId = IPS_CreateVariable(3); IPS_SetName(\$varId, "MCP Timer Params"); IPS_SetParent(\$varId, \$catId); }
-    \$json = (string)GetValue(\$varId);
-    if (\$json !== '') { SetValue(\$varId, ''); \$p = json_decode(\$json, true); if (isset(\$p['VariableID'], \$p['DelaySeconds'])) { \$variableId = (int)\$p['VariableID']; \$value = isset(\$p['Value']) ? \$p['Value'] : false; \$delaySeconds = (int)\$p['DelaySeconds']; } }
+// ${SymconClient.MCP_DELAYED_ACTION_CONTROL_SCRIPT_NAME}
+// Queue: Variable "${SymconClient.MCP_TIMER_QUEUE_VAR_NAME}" (JSON-Array von {runAt, variableId, value})
+// Enqueue: IPS_RunScriptEx mit VariableID, Value, DelaySeconds
+// Dispatch: zyklischer Aufruf per Event (alle 10s)
+
+$catId = IPS_GetParent($_IPS['SELF']);
+$queueVarId = @IPS_GetObjectIDByName("${SymconClient.MCP_TIMER_QUEUE_VAR_NAME}", $catId);
+if (!$queueVarId) {
+    $queueVarId = IPS_CreateVariable(3);
+    IPS_SetName($queueVarId, "${SymconClient.MCP_TIMER_QUEUE_VAR_NAME}");
+    IPS_SetParent($queueVarId, $catId);
+    SetValue($queueVarId, "[]");
 }
-if (\$variableId <= 0 || \$delaySeconds <= 0) { return; }
-\$valuePhp = is_bool(\$value) ? (\$value ? 'true' : 'false') : (is_numeric(\$value) ? (string)\$value : json_encode(\$value));
-\$sid = IPS_CreateScript(0);
-\$inner = '<?php' . "\\n" . 'sleep(' . \$delaySeconds . ');' . "\\n" . 'RequestAction(' . \$variableId . ', ' . \$valuePhp . ');' . "\\n" . 'IPS_DeleteScript(\$_IPS[\\'SELF\\'], true);' . "\\n";
-IPS_SetScriptContent(\$sid, \$inner);
-IPS_SetName(\$sid, 'MCP Delayed Action (einmalig)');
-IPS_SetParent(\$sid, IPS_GetParent(\$_IPS['SELF']));
-IPS_RunScript(\$sid);
+
+function mcp_timer_lock_enter() { return IPS_SemaphoreEnter("MCP_TIMER_QUEUE", 2000); }
+function mcp_timer_lock_leave() { IPS_SemaphoreLeave("MCP_TIMER_QUEUE"); }
+
+function mcp_timer_read_queue($queueVarId) {
+    $raw = (string)GetValue($queueVarId);
+    if ($raw === "") $raw = "[]";
+    $q = json_decode($raw, true);
+    return is_array($q) ? $q : [];
+}
+
+function mcp_timer_write_queue($queueVarId, $queue) {
+    SetValue($queueVarId, json_encode(array_values($queue), JSON_UNESCAPED_UNICODE));
+}
+
+$now = time();
+
+// ---- Enqueue (wenn Parameter per RunScriptEx übergeben wurden) ----
+if (isset($_IPS["VariableID"]) && isset($_IPS["DelaySeconds"])) {
+    $variableId = (int)$_IPS["VariableID"];
+    $delaySeconds = (int)$_IPS["DelaySeconds"];
+    $value = isset($_IPS["Value"]) ? $_IPS["Value"] : false;
+    if ($variableId > 0 && $delaySeconds > 0) {
+        $runAt = $now + $delaySeconds;
+        if (mcp_timer_lock_enter()) {
+            $q = mcp_timer_read_queue($queueVarId);
+            $q[] = ["runAt" => $runAt, "variableId" => $variableId, "value" => $value];
+            mcp_timer_write_queue($queueVarId, $q);
+            mcp_timer_lock_leave();
+        }
+    }
+}
+
+// ---- Dispatch (fällige Einträge ausführen) ----
+if (!mcp_timer_lock_enter()) { return; }
+$q = mcp_timer_read_queue($queueVarId);
+if (count($q) === 0) { mcp_timer_lock_leave(); return; }
+$due = [];
+$future = [];
+foreach ($q as $item) {
+    if (!is_array($item)) continue;
+    $runAt = isset($item["runAt"]) ? (int)$item["runAt"] : 0;
+    if ($runAt <= 0) continue;
+    if ($runAt <= $now) $due[] = $item; else $future[] = $item;
+}
+mcp_timer_write_queue($queueVarId, $future);
+mcp_timer_lock_leave();
+
+foreach ($due as $item) {
+    $vid = isset($item["variableId"]) ? (int)$item["variableId"] : 0;
+    if ($vid <= 0) continue;
+    $val = isset($item["value"]) ? $item["value"] : false;
+    @RequestAction($vid, $val);
+}
 `;
+
+    // Skript anlegen/aktualisieren
+    let scriptId: number;
     try {
-      const existingId = await this.getScriptIdByName(SymconClient.MCP_DELAYED_ACTION_CONTROL_SCRIPT_NAME, categoryId);
-      await this.setScriptContent(existingId, content);
-      try {
-        await this.getObjectIdByName('MCP Timer Params', categoryId);
-      } catch {
-        const varId = await this.createVariable(3);
-        await this.setName(varId, 'MCP Timer Params');
-        await this.setParent(varId, categoryId);
-      }
-      return existingId;
+      scriptId = await this.getScriptIdByName(SymconClient.MCP_DELAYED_ACTION_CONTROL_SCRIPT_NAME, categoryId);
     } catch {
-      // Skript existiert nicht → anlegen
+      scriptId = await this.createScript(0);
+      await this.setName(scriptId, SymconClient.MCP_DELAYED_ACTION_CONTROL_SCRIPT_NAME);
+      await this.setParent(scriptId, categoryId);
     }
-    const scriptId = await this.createScript(0);
     await this.setScriptContent(scriptId, content);
-    await this.setName(scriptId, SymconClient.MCP_DELAYED_ACTION_CONTROL_SCRIPT_NAME);
-    await this.setParent(scriptId, categoryId);
+
+    // Dispatcher-Event sicherstellen (alle 10 Sekunden)
+    let eventId: number;
     try {
-      await this.getObjectIdByName('MCP Timer Params', categoryId);
+      eventId = await this.getObjectIdByName(SymconClient.MCP_TIMER_DISPATCH_EVENT_NAME, categoryId);
     } catch {
-      const varId = await this.createVariable(3);
-      await this.setName(varId, 'MCP Timer Params');
-      await this.setParent(varId, categoryId);
+      eventId = await this.createEvent(1);
+      await this.setName(eventId, SymconClient.MCP_TIMER_DISPATCH_EVENT_NAME);
+      await this.setParent(eventId, categoryId);
     }
+    await this.setEventScript(eventId, `IPS_RunScript(${scriptId});`);
+    // Jede Sekunde ausführen, damit kurze Timer (z. B. 10s) zuverlässig sind.
+    await this.setEventCyclic(eventId, 0, 0, 0, 0, 1, 1);
+    await this.setEventActive(eventId, true);
+
+    // Queue initialisieren, falls leer
+    try {
+      const raw = await this.getValue(queueVarId);
+      if (typeof raw !== 'string' || raw.trim() === '') {
+        await this.setValue(queueVarId, '[]');
+      }
+    } catch {
+      // ignore
+    }
+
     return scriptId;
   }
 

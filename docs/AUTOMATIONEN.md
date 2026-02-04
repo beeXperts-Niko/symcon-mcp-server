@@ -28,7 +28,7 @@ Die KI soll beim Anlegen immer **symcon_automation_get_or_create_folder** mit ei
 | Tool | Zweck |
 |------|--------|
 | **symcon_automation_get_or_create_folder(categoryPath)** | Erstellt oder liefert die Kategorie-Pfadkette (rootCategoryId, categoryId, path). |
-| **symcon_schedule_once(variableId, value, delayMinutes?, delaySeconds?, label?, categoryPath?)** | Einmalige zeitverzögerte Aktion (RequestAction). Nutzt Symcon-Timer-API (IPS_SetEventCyclicDateBounds). **Fallback**, wenn API nicht verfügbar: **MCP Delayed Action Control** – ein festes Control-Skript unter *MCP Automations/Timer*, dem VariableID, Value und DelaySeconds per IPS_RunScriptEx übergeben werden; es erzeugt ein einmaliges Skript (sleep → RequestAction → IPS_DeleteScript(self)) und startet es asynchron. Beliebige Werte (z. B. Rolllade 0/100) werden durchgereicht. |
+| **symcon_schedule_once(variableId, value, delayMinutes?, delaySeconds?, label?, categoryPath?)** | Einmalige zeitverzögerte Aktion (RequestAction). Nutzt Symcon-Timer-API (IPS_SetEventCyclicDateBounds). **Fallback**, wenn API nicht verfügbar: **MCP Delayed Action Control** – ein festes Control-Skript unter *MCP Automations/Timer* mit Queue-Variable **„MCP Timer Queue“** + Dispatcher-Event (jede Sekunde). Enqueue per IPS_RunScriptEx(VariableID, Value, DelaySeconds); wenn das nicht klappt, per IPS_RunScriptText (Semaphore/atomar). **Keine** pro Timer eigenen Skripte. Beliebige Werte (z. B. Rolllade 0/100) werden durchgereicht. |
 | **symcon_script_create(name, content, categoryPath? \| parentCategoryId)** | PHP-Skript anlegen, Inhalt setzen, unter Kategorie einordnen. |
 | **symcon_script_set_content(scriptId, content)** | Skript-Inhalt aktualisieren. |
 | **symcon_script_delete(scriptId)** | Skript löschen (Events vorher löschen oder trennen). |
@@ -43,10 +43,10 @@ Die KI soll beim Anlegen immer **symcon_automation_get_or_create_folder** mit ei
 Wenn **IPS_SetEventCyclicDateBounds** oder **IPS_SetEventCyclicTimeBounds** nicht verfügbar sind, nutzt symcon_schedule_once ein **Control-Skript** in Symcon:
 
 1. **MCP Delayed Action Control** – wird beim ersten Fallback-Aufruf unter *MCP Automations / Timer* angelegt (falls noch nicht vorhanden). Name: „MCP Delayed Action Control“.
-2. Der MCP-Server ruft es per **IPS_RunScriptEx** mit den Parametern **VariableID**, **Value**, **DelaySeconds** auf (asynchron).
-3. Das Control-Skript erzeugt ein **einmaliges** PHP-Skript mit: `sleep(DelaySeconds); RequestAction(VariableID, Value); IPS_DeleteScript($_IPS['SELF'], true);` und startet es mit **IPS_RunScript** (asynchron). Das einmalige Skript löscht sich nach der Aktion selbst (IPS_DeleteScript erfordert zwei Parameter: ScriptID, DeleteFile). Wenn **IPS_RunScriptEx** fehlschlägt, übergibt der MCP die Parameter per Variable „MCP Timer Params“ (JSON) und startet das Control-Skript mit **IPS_RunScript**.
+2. Der MCP-Server enqueued die Aktion per **IPS_RunScriptEx** mit **VariableID**, **Value**, **DelaySeconds** (asynchron). Wenn RunScriptEx in der Symcon-Instanz nicht zuverlässig funktioniert, nutzt der MCP **IPS_RunScriptText** und schreibt den Queue-Eintrag atomar per **IPS_SemaphoreEnter**.
+3. Das Control-Skript wird von einem **Dispatcher-Event** (jede Sekunde) gestartet. Es liest die Queue-Variable **„MCP Timer Queue“** und führt alle fälligen Actions per `RequestAction(VariableID, Value)` aus.
 
-Es gibt **nur dieses eine** Control-Skript; der MCP legt keine weiteren Runner- oder Einmalig-Skripte an. Temporäre Timer-Skripte werden von diesem Skript erzeugt und löschen sich nach der Aktion selbst. **Value** kann boolean (Licht ein/aus), Zahl (z. B. Rolllade 0/100) oder String sein – der MCP übergibt den Wert unverändert (bei String „zu“/„aus“/„off“ wird für den Fallback false, sonst true verwendet).
+Es gibt **nur dieses eine** Control-Skript plus die Queue-Variable und das Event – es werden **keine** temporären Timer-Skripte mehr angelegt. Dadurch funktionieren auch mehrere gleichzeitige Timer zuverlässig. **Value** kann boolean (Licht ein/aus), Zahl (z. B. Rolllade 0/100) oder String sein – der MCP übergibt den Wert unverändert (bei String „zu“/„aus“/„off“ wird für den Fallback false, sonst true verwendet).
 
 ## Keine Duplikate – Registry nutzen
 

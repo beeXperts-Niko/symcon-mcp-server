@@ -35,9 +35,9 @@ export declare class SymconClient {
     getValue(variableId: number): Promise<unknown>;
     /**
      * Normalisiert den Wert für SetValue/RequestAction.
-     * Symcon erwartet bei Float-Variablen (z. B. Level ~Intensity.1) einen passenden Typ;
-     * über JSON-RPC werden ganze Zahlen als Integer übergeben, was zu "Parameter type of Value does not match" führt.
-     * Zahlen werden daher als String gesendet, damit Symcon sie in den Variablentyp konvertieren kann.
+     * Symcon prüft den Typ streng: Float-Variablen (z. B. Level ~Intensity.1) erwarten Float;
+     * über JSON-RPC wird 0 als Integer geliefert → "Parameter type of Value does not match".
+     * Wir senden Zahlen als Dezimal-String (z. B. "0.0", "100.0"), damit PHP (float)"0.0" nutzen kann.
      */
     private normalizeValue;
     setValue(variableId: number, value: unknown): Promise<void>;
@@ -50,6 +50,8 @@ export declare class SymconClient {
      * von params in $_IPS (z. B. params.VariableID → $_IPS['VariableID']).
      */
     runScriptEx(scriptId: number, params: Record<string, unknown>): Promise<unknown>;
+    /** Führt PHP-Text direkt aus (asynchron). */
+    runScriptText(scriptText: string): Promise<unknown>;
     getObjectIdByName(name: string, parentId?: number): Promise<number>;
     getVariable(variableId: number): Promise<unknown>;
     createCategory(): Promise<number>;
@@ -72,10 +74,12 @@ export declare class SymconClient {
     getEvent(eventId: number): Promise<unknown>;
     /** Name des MCP-Control-Skripts für verzögerte Aktionen (Timer). Wird unter MCP Automations/Timer angelegt. */
     static readonly MCP_DELAYED_ACTION_CONTROL_SCRIPT_NAME = "MCP Delayed Action Control";
+    static readonly MCP_TIMER_QUEUE_VAR_NAME = "MCP Timer Queue";
+    static readonly MCP_TIMER_DISPATCH_EVENT_NAME = "MCP Timer Dispatcher";
     /**
      * Erstellt oder liefert die Script-ID des MCP Control-Skripts für verzögerte Aktionen.
-     * Das Skript erwartet per IPS_RunScriptEx: VariableID, Value, DelaySeconds.
-     * Es erzeugt ein einmaliges Skript (sleep → RequestAction → IPS_DeleteScript(self, true)) und startet es asynchron.
+     * Das Skript verwaltet eine Timer-Queue (Variable `MCP Timer Queue`) und wird zyklisch (alle 10s)
+     * durch ein Event aufgerufen. Enqueue erfolgt per IPS_RunScriptEx(VariableID, Value, DelaySeconds).
      */
     getOrCreateDelayedActionControlScript(): Promise<number>;
     /**
