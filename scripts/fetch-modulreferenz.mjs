@@ -3,7 +3,12 @@
  * Lädt die IP-Symcon Modulreferenz (Geräte) von symcon.de und erzeugt
  * libs/mcp-server/data/modulreferenz-geraete.json für das MCP.
  *
- * Aufruf: node scripts/fetch-modulreferenz.mjs
+ * Aufruf:
+ *   node scripts/fetch-modulreferenz.mjs              # nur Namen + URL
+ *   node scripts/fetch-modulreferenz.mjs --deep       # Kategorieseiten für volle Link-Liste
+ *   node scripts/fetch-modulreferenz.mjs --with-details  # pro Modul-URL Detailseite laden, Summary extrahieren
+ *   node scripts/fetch-modulreferenz.mjs --with-details --max-details=50  # max. 50 Detail-Abrufe (z. B. zum Testen)
+ *
  * Quelle: https://www.symcon.de/de/service/dokumentation/modulreferenz/geraete/
  */
 
@@ -16,6 +21,13 @@ const BASE = 'https://www.symcon.de';
 const URL = `${BASE}/de/service/dokumentation/modulreferenz/geraete/`;
 const OUT_DIR = join(__dirname, '..', 'libs', 'mcp-server', 'data');
 const OUT_JSON = join(OUT_DIR, 'modulreferenz-geraete.json');
+
+const DEFAULT_DETAIL_DELAY_MS = 400;
+const DEFAULT_SUMMARY_MAX_LENGTH = 1200;
+
+function delay(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 async function fetchPage(url) {
   const res = await fetch(url, {
@@ -126,6 +138,7 @@ function parseCategoryPage(html, catId) {
     if (!name || name === 'Geräteliste' || name === '« Zurück' || name.length > 80 || name.length < 2) continue;
     if (name === 'DE' || /^[A-Z]{2}$/.test(name)) continue; // Sprach-Links etc. auslassen
     const fullUrl = href.startsWith('http') ? href : BASE + href;
+    if (/[\s"<>]/.test(fullUrl)) continue; // ungültige URLs (z. B. fehlerhaft geparste "DE"-Links) auslassen
     const key = fullUrl;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -134,7 +147,69 @@ function parseCategoryPage(html, catId) {
   return functions;
 }
 
+/**
+ * Extrahiert aus einer Modul-Dokumentationsseite (HTML) Titel und Kurztext (Summary).
+ * @param {string} html
+ * @param {number} summaryMaxLength
+ * @returns {{ pageTitle: string, summary: string }}
+ */
+function parseModulePage(html, summaryMaxLength = DEFAULT_SUMMARY_MAX_LENGTH) {
+  let pageTitle = '';
+  let summary = '';
+
+  // Titel: <h1> oder aus <title> (ohne " — IP-Symcon ...")
+  const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  if (h1Match) {
+    pageTitle = (h1Match[1] || '').replace(/<[^>]+>/g, '').trim();
+  }
+  if (!pageTitle) {
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (titleMatch) {
+      pageTitle = (titleMatch[1] || '').split('—')[0].split('::')[0].trim();
+    }
+  }
+
+  // Hauptinhalt: oft in <main>, <article> oder nach erstem <h1>; sonst <body>
+  let content = html;
+  const mainMatch = content.match(/<main[^>]*>([\s\S]*?)<\/main>/i) || content.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
+  if (mainMatch) content = mainMatch[1];
+  else {
+    const bodyMatch = content.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bodyMatch) content = bodyMatch[1];
+  }
+
+  // HTML zu Fließtext: Tags entfernen, Entities ersetzen, Leerzeilen begrenzen
+  let text = content
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+    .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (text.length > summaryMaxLength) {
+    text = text.slice(0, summaryMaxLength).trim();
+    const lastSpace = text.lastIndexOf(' ');
+    if (lastSpace > summaryMaxLength / 2) text = text.slice(0, lastSpace);
+    text += ' …';
+  }
+  summary = text;
+
+  return { pageTitle, summary };
+}
+
 async function main() {
+  const withDetails = process.argv.includes('--with-details');
+  const maxDetailsArg = process.argv.find((a) => a.startsWith('--max-details='));
+  const maxDetails = maxDetailsArg ? parseInt(maxDetailsArg.split('=')[1], 10) : null;
+
   console.log('Fetching', URL);
   const html = await fetchPage(URL);
   let categories = parseHtml(html);
@@ -156,9 +231,36 @@ async function main() {
       }
     }
   }
+
+  // Optional: pro Modul-URL die Detailseite laden und Summary extrahieren
+  if (withDetails) {
+    let fetched = 0;
+    const limit = maxDetails ?? Infinity;
+    console.log('Fetching module detail pages (summary)...');
+    for (const cat of categories) {
+      for (const fn of cat.functions) {
+        if (fetched >= limit) break;
+        try {
+          await delay(DEFAULT_DETAIL_DELAY_MS);
+          const pageHtml = await fetchPage(fn.url);
+          const { pageTitle, summary } = parseModulePage(pageHtml);
+          if (pageTitle) fn.pageTitle = pageTitle;
+          if (summary) fn.summary = summary;
+          fetched++;
+          if (fetched % 10 === 0) console.log('  ', fetched, 'details loaded');
+        } catch (e) {
+          console.warn('  ', fn.name, fn.url, ':', e.message);
+        }
+      }
+      if (fetched >= limit) break;
+    }
+    console.log('  Total details:', fetched);
+  }
+
   const payload = {
     sourceUrl: URL,
     updated: new Date().toISOString(),
+    withDetails: withDetails,
     categories: categories.filter((c) => c.functions.length > 0 || c.description),
   };
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });

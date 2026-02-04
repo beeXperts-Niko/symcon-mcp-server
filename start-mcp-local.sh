@@ -22,7 +22,7 @@ if [ -f "$SCRIPT_DIR/local-config.env" ]; then
   set +a
 fi
 
-SYMCON_URL="${1:-${SYMCON_API_URL:-http://192.168.10.12:3777/api/}}"
+SYMCON_URL="${1:-${SYMCON_API_URL:-}}"
 MCP_API_KEY="${2:-${MCP_AUTH_TOKEN:-}}"
 SYMCON_USER="${SYMCON_API_USER:-}"
 SYMCON_PASS="${SYMCON_API_PASSWORD:-}"

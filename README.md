@@ -16,6 +16,28 @@ Symcon-Bibliothek mit dem Modul **MCP Server**: Ein PHP-Wrapper startet einen No
 
 Ausführlich: [ANLEITUNG_INSTALLATION.md](ANLEITUNG_INSTALLATION.md).
 
+**Sprachassistent bauen:** Wenn du sprechen willst und der Assistent mit Sprache antwortet und dein Haus steuert: [docs/SPRACHASSISTENT_BAUEN.md](docs/SPRACHASSISTENT_BAUEN.md) – Optionen mit ChatGPT/OpenAI Realtime API, Whisper+TTS oder externen Voice-Plattformen.
+
+**Server im Internet + Smart Home im eigenen Netz:** Wenn dein Dienst auf einem Server im Internet läuft und das Smart Home im Heimnetz nicht von außen erreichbar ist: [docs/ARCHITEKTUR_SERVER_IM_INTERNET.md](docs/ARCHITEKTUR_SERVER_IM_INTERNET.md) – Outbound-Verbindung vom Smart Home zum Server, Brücke im Heimnetz, Web-App mit Mikrofon und optional lokaler Auswertung, dann Whisper + ChatGPT auf dem Server.
+
+## Ausführung: Symcon vs. lokal
+
+**Auf der SymBox / in Symcon selbst:** Der MCP-Server läuft **aktuell noch nicht** auf der SymBox (IP-Symcon als Instanz). Die Ausführung direkt in IP-Symcon hat noch Probleme (z. B. Umgebung, Node-Ausführung). Wir arbeiten daran.
+
+**Lokal (empfohlen):** Der Server läuft zuverlässig, wenn Sie ihn auf Ihrem Rechner starten und dabei die Symcon-API (lokal oder im Netz) ansprechen. Dafür **muss** die **`local-config.env`** angepasst werden:
+
+1. Im Projektordner `symcon-mcp-server`: **`local-config.env`** anlegen – z. B. `cp local-config.env.example local-config.env` – und anpassen:
+   - **`SYMCON_API_URL`**: Adresse der Symcon-API (z. B. `http://127.0.0.1:3777/api/` oder `http://<SymBox-IP>:3777/api/`).
+   - **`SYMCON_API_USER`** (optional): Lizenz-E-Mail für Symcon Remote Access; Passwort wird beim Start abgefragt.
+   - **`MCP_AUTH_TOKEN`** (optional): MCP-API-Key.
+2. Server starten (Node.js 20+ vorausgesetzt):
+   - **Ohne HTTPS (z. B. für Cursor):** `MCP_HTTP=1 ./start-mcp-local.sh` – der Server läuft dann auf **http://127.0.0.1:4096**; Cursor akzeptiert in der Regel keine self-signed Zertifikate, daher HTTP nutzen.
+   - Mit HTTPS (falls Zertifikate in `certs/` liegen): `./start-mcp-local.sh`.
+   Optional: URL und API-Key als Argumente übergeben.
+3. In Cursor (oder anderem MCP-Client) die MCP-URL auf **http://127.0.0.1:4096** stellen (bei `MCP_HTTP=1`) und den Client ggf. neu starten.
+
+Die Symcon-API bleibt auf dem Gerät, auf dem Symcon läuft (SymBox/PC); der MCP-Server verbindet sich von Ihrem Rechner aus dorthin.
+
 ## Konfiguration
 
 - **Port:** TCP-Port für den MCP-Server (Streamable HTTP).
