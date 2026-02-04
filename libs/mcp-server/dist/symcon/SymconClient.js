@@ -78,7 +78,8 @@ export class SymconClient {
             IPS_CreateScript: ['ScriptType'],
             IPS_SetScriptContent: ['ScriptID', 'Content'],
             IPS_GetScriptContent: ['ScriptID'],
-            IPS_DeleteScript: ['ScriptID'],
+            IPS_DeleteScript: ['ScriptID', 'DeleteFile'],
+            IPS_CreateVariable: ['VariableType'],
             IPS_GetScriptIDByName: ['ScriptName', 'ParentID'],
             IPS_CreateEvent: ['EventType'],
             IPS_SetEventCyclic: ['EventID', 'DateType', 'DateInterval', 'DateDay', 'DateDayInterval', 'TimeType', 'TimeInterval'],
@@ -155,11 +156,15 @@ export class SymconClient {
     async getScriptContent(scriptId) {
         return this.call('IPS_GetScriptContent', [scriptId]);
     }
-    async deleteScript(scriptId) {
-        return this.call('IPS_DeleteScript', [scriptId]);
+    async deleteScript(scriptId, deleteFile = true) {
+        return this.call('IPS_DeleteScript', [scriptId, deleteFile]);
     }
     async getScriptIdByName(scriptName, parentId) {
         return this.call('IPS_GetScriptIDByName', [scriptName, parentId]);
+    }
+    /** Erstellt eine Benutzer-Variable (Typ 0=Boolean, 1=Integer, 2=Float, 3=String). */
+    async createVariable(variableType) {
+        return this.call('IPS_CreateVariable', [variableType]);
     }
     // --- Events (zyklisch / einmalig) ---
     async createEvent(eventType) {
@@ -199,35 +204,60 @@ export class SymconClient {
     /**
      * Erstellt oder liefert die Script-ID des MCP Control-Skripts für verzögerte Aktionen.
      * Das Skript erwartet per IPS_RunScriptEx: VariableID, Value, DelaySeconds.
-     * Es erzeugt ein einmaliges Skript (sleep → RequestAction → IPS_DeleteScript(self)) und startet es asynchron.
+     * Es erzeugt ein einmaliges Skript (sleep → RequestAction → IPS_DeleteScript(self, true)) und startet es asynchron.
      */
     async getOrCreateDelayedActionControlScript() {
         const path = ['MCP Automations', 'Timer'];
         const categoryId = await this.getOrCreateCategoryPath(0, path);
-        try {
-            return await this.getScriptIdByName(SymconClient.MCP_DELAYED_ACTION_CONTROL_SCRIPT_NAME, categoryId);
-        }
-        catch {
-            // Skript existiert nicht → anlegen
-        }
-        const scriptId = await this.createScript(0);
         const content = `<?php
-// Wird per IPS_RunScriptEx aufgerufen. Parameter: VariableID, Value, DelaySeconds (in \$_IPS).
+// Einziges Control-Skript für verzögerte Aktionen. Aufruf per IPS_RunScriptEx (VariableID, Value, DelaySeconds) ODER per Variable "MCP Timer Params" (JSON).
 \$variableId = isset(\$_IPS['VariableID']) ? (int)\$_IPS['VariableID'] : 0;
 \$value = isset(\$_IPS['Value']) ? \$_IPS['Value'] : false;
 \$delaySeconds = isset(\$_IPS['DelaySeconds']) ? (int)\$_IPS['DelaySeconds'] : 0;
+if (\$variableId <= 0 || \$delaySeconds <= 0) {
+    \$catId = IPS_GetParent(\$_IPS['SELF']);
+    \$varId = @IPS_GetObjectIDByName("MCP Timer Params", \$catId);
+    if (!\$varId) { \$varId = IPS_CreateVariable(3); IPS_SetName(\$varId, "MCP Timer Params"); IPS_SetParent(\$varId, \$catId); }
+    \$json = (string)GetValue(\$varId);
+    if (\$json !== '') { SetValue(\$varId, ''); \$p = json_decode(\$json, true); if (isset(\$p['VariableID'], \$p['DelaySeconds'])) { \$variableId = (int)\$p['VariableID']; \$value = isset(\$p['Value']) ? \$p['Value'] : false; \$delaySeconds = (int)\$p['DelaySeconds']; } }
+}
 if (\$variableId <= 0 || \$delaySeconds <= 0) { return; }
 \$valuePhp = is_bool(\$value) ? (\$value ? 'true' : 'false') : (is_numeric(\$value) ? (string)\$value : json_encode(\$value));
 \$sid = IPS_CreateScript(0);
-\$inner = '<?php' . "\\n" . 'sleep(' . \$delaySeconds . ');' . "\\n" . 'RequestAction(' . \$variableId . ', ' . \$valuePhp . ');' . "\\n" . 'IPS_DeleteScript(\$_IPS[\\'SELF\\']);' . "\\n";
+\$inner = '<?php' . "\\n" . 'sleep(' . \$delaySeconds . ');' . "\\n" . 'RequestAction(' . \$variableId . ', ' . \$valuePhp . ');' . "\\n" . 'IPS_DeleteScript(\$_IPS[\\'SELF\\'], true);' . "\\n";
 IPS_SetScriptContent(\$sid, \$inner);
 IPS_SetName(\$sid, 'MCP Delayed Action (einmalig)');
 IPS_SetParent(\$sid, IPS_GetParent(\$_IPS['SELF']));
 IPS_RunScript(\$sid);
 `;
+        try {
+            const existingId = await this.getScriptIdByName(SymconClient.MCP_DELAYED_ACTION_CONTROL_SCRIPT_NAME, categoryId);
+            await this.setScriptContent(existingId, content);
+            try {
+                await this.getObjectIdByName('MCP Timer Params', categoryId);
+            }
+            catch {
+                const varId = await this.createVariable(3);
+                await this.setName(varId, 'MCP Timer Params');
+                await this.setParent(varId, categoryId);
+            }
+            return existingId;
+        }
+        catch {
+            // Skript existiert nicht → anlegen
+        }
+        const scriptId = await this.createScript(0);
         await this.setScriptContent(scriptId, content);
         await this.setName(scriptId, SymconClient.MCP_DELAYED_ACTION_CONTROL_SCRIPT_NAME);
         await this.setParent(scriptId, categoryId);
+        try {
+            await this.getObjectIdByName('MCP Timer Params', categoryId);
+        }
+        catch {
+            const varId = await this.createVariable(3);
+            await this.setName(varId, 'MCP Timer Params');
+            await this.setParent(varId, categoryId);
+        }
         return scriptId;
     }
     /**

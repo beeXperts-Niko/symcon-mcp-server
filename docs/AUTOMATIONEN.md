@@ -44,9 +44,9 @@ Wenn **IPS_SetEventCyclicDateBounds** oder **IPS_SetEventCyclicTimeBounds** nich
 
 1. **MCP Delayed Action Control** – wird beim ersten Fallback-Aufruf unter *MCP Automations / Timer* angelegt (falls noch nicht vorhanden). Name: „MCP Delayed Action Control“.
 2. Der MCP-Server ruft es per **IPS_RunScriptEx** mit den Parametern **VariableID**, **Value**, **DelaySeconds** auf (asynchron).
-3. Das Control-Skript erzeugt ein **einmaliges** PHP-Skript mit: `sleep(DelaySeconds); RequestAction(VariableID, Value); IPS_DeleteScript($_IPS['SELF']);` und startet es mit **IPS_RunScript** (asynchron). Das einmalige Skript läuft im Hintergrund und löscht sich nach der Aktion selbst.
+3. Das Control-Skript erzeugt ein **einmaliges** PHP-Skript mit: `sleep(DelaySeconds); RequestAction(VariableID, Value); IPS_DeleteScript($_IPS['SELF'], true);` und startet es mit **IPS_RunScript** (asynchron). Das einmalige Skript löscht sich nach der Aktion selbst (IPS_DeleteScript erfordert zwei Parameter: ScriptID, DeleteFile). Wenn **IPS_RunScriptEx** fehlschlägt, übergibt der MCP die Parameter per Variable „MCP Timer Params“ (JSON) und startet das Control-Skript mit **IPS_RunScript**.
 
-So können temporäre Timer-Skripte verlässlich wieder entfernt werden; es bleibt nur das eine permanente Control-Skript. **Value** kann boolean (Licht ein/aus), Zahl (z. B. Rolllade 0/100) oder String sein – der MCP übergibt den Wert unverändert (bei String „zu“/„aus“/„off“ wird für den Fallback false, sonst true verwendet).
+Es gibt **nur dieses eine** Control-Skript; der MCP legt keine weiteren Runner- oder Einmalig-Skripte an. Temporäre Timer-Skripte werden von diesem Skript erzeugt und löschen sich nach der Aktion selbst. **Value** kann boolean (Licht ein/aus), Zahl (z. B. Rolllade 0/100) oder String sein – der MCP übergibt den Wert unverändert (bei String „zu“/„aus“/„off“ wird für den Fallback false, sonst true verwendet).
 
 ## Keine Duplikate – Registry nutzen
 

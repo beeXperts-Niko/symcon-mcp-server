@@ -766,16 +766,20 @@ export function createToolHandlers(client: SymconClient): Record<string, { descr
 
         const runControlScriptFallback = async (): Promise<{ ok: true; controlScript: true; runsAtUnix: number; hint: string }> => {
           const controlScriptId = await client.getOrCreateDelayedActionControlScript();
-          await client.runScriptEx(controlScriptId, {
-            VariableID: variableId,
-            Value: valueForAction,
-            DelaySeconds: delayTotalSeconds,
-          });
+          const payload = { VariableID: variableId, Value: valueForAction, DelaySeconds: delayTotalSeconds };
+          try {
+            await client.runScriptEx(controlScriptId, payload);
+          } catch {
+            // RunScriptEx nicht verfügbar (z. B. Parameter count mismatch) → Parameter per Variable übergeben
+            const paramsVarId = await client.getObjectIdByName('MCP Timer Params', categoryId);
+            await client.setValue(paramsVarId, JSON.stringify(payload));
+            await client.runScript(controlScriptId);
+          }
           return {
             ok: true,
             controlScript: true,
             runsAtUnix: targetTs,
-            hint: 'Timer-API nicht verfügbar. MCP Delayed Action Control-Skript erstellt/verwendet: erzeugt einmaliges Skript (sleep → RequestAction → Selbstlöschung) und startet es asynchron.',
+            hint: 'Nur ein Control-Skript (MCP Delayed Action Control): erzeugt einmaliges Skript (sleep → RequestAction → IPS_DeleteScript(self, true)) und startet es asynchron. Keine weiteren Skripte anlegen.',
           };
         };
 

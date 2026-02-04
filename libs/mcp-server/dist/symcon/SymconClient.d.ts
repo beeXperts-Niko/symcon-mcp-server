@@ -58,8 +58,10 @@ export declare class SymconClient {
     createScript(scriptType: number): Promise<number>;
     setScriptContent(scriptId: number, content: string): Promise<boolean>;
     getScriptContent(scriptId: number): Promise<string>;
-    deleteScript(scriptId: number): Promise<boolean>;
+    deleteScript(scriptId: number, deleteFile?: boolean): Promise<boolean>;
     getScriptIdByName(scriptName: string, parentId: number): Promise<number>;
+    /** Erstellt eine Benutzer-Variable (Typ 0=Boolean, 1=Integer, 2=Float, 3=String). */
+    createVariable(variableType: number): Promise<number>;
     createEvent(eventType: number): Promise<number>;
     setEventCyclic(eventId: number, dateType: number, dateInterval: number, dateDay: number, dateDayInterval: number, timeType: number, timeInterval: number): Promise<boolean>;
     setEventCyclicDateBounds(eventId: number, fromDate: number, toDate: number): Promise<boolean>;
@@ -73,7 +75,7 @@ export declare class SymconClient {
     /**
      * Erstellt oder liefert die Script-ID des MCP Control-Skripts für verzögerte Aktionen.
      * Das Skript erwartet per IPS_RunScriptEx: VariableID, Value, DelaySeconds.
-     * Es erzeugt ein einmaliges Skript (sleep → RequestAction → IPS_DeleteScript(self)) und startet es asynchron.
+     * Es erzeugt ein einmaliges Skript (sleep → RequestAction → IPS_DeleteScript(self, true)) und startet es asynchron.
      */
     getOrCreateDelayedActionControlScript(): Promise<number>;
     /**
