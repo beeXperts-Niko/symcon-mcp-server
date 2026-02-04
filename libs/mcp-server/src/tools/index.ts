@@ -4,6 +4,8 @@
  * Wissensbasis-Tools nutzen KnowledgeStore für gelernte Geräte-Zuordnungen.
  */
 
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { SymconClient } from '../symcon/SymconClient.js';
 import { getKnowledgeStore } from '../knowledge/KnowledgeStore.js';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -431,6 +433,76 @@ export function createToolHandlers(client: SymconClient): Record<string, { descr
                 (changes.length > 0
                   ? '\n\nGeänderte Variablen: variableId für symcon_set_value/symcon_get_object/symcon_knowledge_set nutzen.'
                   : '\n\nKeine Änderungen. User evtl. bitten, die Aktion auszuführen, oder anderen Bereich (rootId) snappen.'),
+            },
+          ],
+        };
+      },
+    },
+    symcon_get_module_reference: {
+      description:
+        'Liefert die Symcon-Modulreferenz (Geräte): Kategorien und Funktionen/Module aus der offiziellen Dokumentation (symcon.de). Nutzen: KI kann nachschlagen, wie ein Modul (z. B. HomeMatic, Hue, Z-Wave, EnOcean) bedient wird – welche Befehle/Funktionen es gibt. Optional: category (z. B. "homematic", "z-wave") oder search (Suchbegriff in Namen) zum Filtern.',
+      inputSchema: z.object({
+        category: z.string().optional().describe('Nur diese Kategorie (id), z. B. homematic, z-wave, enocean'),
+        search: z.string().optional().describe('Suchbegriff in Funktions-/Modulnamen'),
+      }),
+      handler: async (args: HandlerArgs) => {
+        const { category, search } = getArgs<{ category?: string; search?: string }>(args);
+        const candidates = [
+          join(process.cwd(), 'data', 'modulreferenz-geraete.json'),
+          join(process.cwd(), 'libs', 'mcp-server', 'data', 'modulreferenz-geraete.json'),
+        ];
+        let path: string | null = null;
+        for (const p of candidates) {
+          if (existsSync(p)) {
+            path = p;
+            break;
+          }
+        }
+        if (!path) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  ok: false,
+                  error: 'Modulreferenz-Datei nicht gefunden. Bitte scripts/fetch-modulreferenz.mjs ausführen.',
+                  expectedPaths: candidates,
+                }),
+              },
+            ],
+          };
+        }
+        const raw = readFileSync(path, 'utf8');
+        let data: { sourceUrl: string; updated: string; categories: { id: string; name: string; description: string; functions: { name: string; description: string; url: string }[] }[] };
+        try {
+          data = JSON.parse(raw) as typeof data;
+        } catch {
+          return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: 'Modulreferenz-Datei ist kein gültiges JSON.' }) }] };
+        }
+        let categories = data.categories;
+        if (category) {
+          const catNorm = category.trim().toLowerCase();
+          categories = categories.filter((c) => c.id.toLowerCase().includes(catNorm) || c.name.toLowerCase().includes(catNorm));
+        }
+        if (search) {
+          const searchNorm = search.trim().toLowerCase();
+          categories = categories
+            .map((c) => ({
+              ...c,
+              functions: c.functions.filter((f) => f.name.toLowerCase().includes(searchNorm) || (f.description && f.description.toLowerCase().includes(searchNorm))),
+            }))
+            .filter((c) => c.functions.length > 0);
+        }
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                JSON.stringify(
+                  { sourceUrl: data.sourceUrl, updated: data.updated, categories },
+                  null,
+                  2
+                ) + '\n\nQuelle: ' + data.sourceUrl + ' – KI kann hier nach Modul/Befehl (z. B. HomeMatic, HM_WriteValueBoolean, Z-Wave SwitchMode) suchen.',
             },
           ],
         };
