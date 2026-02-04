@@ -2,7 +2,7 @@
 
 So nutzt du dein Symcon-Smart-Home **mit Claude** (Anthropic): MCP-Server verbinden + Anweisungen für „erster Überblick“ und interaktives Reden.
 
-**Hinweis:** Claude setzt bei Konnektoren-URLs **HTTPS** voraus. Der Symcon MCP-Server läuft unter HTTP – nutze daher die **.mcpb-Erweiterung** oder die **Config-Datei** (siehe unten).
+**Hinweis:** Claude setzt bei Konnektoren-URLs **HTTPS** voraus. Der Symcon MCP-Server läuft standardmäßig unter HTTP – nutze die **.mcpb-Erweiterung** oder die **Config-Datei**. Optional kannst du den Server per **HTTPS** starten (Abschnitt 6), dann funktioniert auch **„Benutzerdefinierten Connector hinzufügen“** mit `https://127.0.0.1:4096`.
 
 ---
 
@@ -12,7 +12,7 @@ In Claude Desktop siehst du unter **Einstellungen → Erweiterungen** oft: **„
 
 - **.mcpb / .dxt** = vorgepackte Erweiterungen (ein Klick, alles drin). Unser Symcon-Server ist ein **Streamable-HTTP-Server unter einer URL** – dafür gibt es jetzt **eine .mcpb-Datei zum Reinziehen**.
 
-**Zwei nutzbare Wege:** .mcpb-Datei reinziehen (empfohlen) oder Config-Datei. Der Dialog **„Benutzerdefinierten Connector hinzufügen“** (URL) **funktioniert nicht**, weil Claude dort nur **HTTPS** akzeptiert – der Symcon-Server läuft unter HTTP.
+**Drei Wege:** .mcpb-Datei reinziehen (empfohlen), Config-Datei, oder **Connector-URL** (nur mit HTTPS – siehe Abschnitt 6).
 
 ---
 
@@ -92,11 +92,9 @@ Der Adapter (`@pyroprompts/mcp-stdio-to-streamable-http-adapter`) läuft lokal u
 
 ---
 
-### Variante B: „Benutzerdefinierten Connector hinzufügen“ (URL) – **funktioniert nicht mit Symcon**
+### Variante B: „Benutzerdefinierten Connector hinzufügen“ (URL) – **nur mit HTTPS**
 
-Unter **Einstellungen → Konnektoren** gibt es oft **„Benutzerdefinierten Connector hinzufügen“**, wo man eine **Server-URL** eintragen kann. **Claude verlangt dort zwingend HTTPS** (Fehlermeldung: „URL muss mit 'https' beginnen“). Der Symcon MCP-Server läuft aber unter **HTTP** (z. B. `http://127.0.0.1:4096`). Daher ist dieser Weg **für Symcon nicht nutzbar**.
-
-**Empfehlung:** Symcon ausschließlich über **Variante 0 (.mcpb)** oder **Variante A (Config-Datei)** einbinden – dort wird die HTTP-URL nur intern vom Adapter genutzt, Claude prüft sie nicht auf HTTPS.
+Unter **Einstellungen → Konnektoren** gibt es **„Benutzerdefinierten Connector hinzufügen“**, wo man eine **Server-URL** eintragen kann. **Claude verlangt dort HTTPS**. Starte den Symcon MCP-Server mit **HTTPS** (Abschnitt 6), dann kannst du z. B. `https://127.0.0.1:4096` eintragen. Ohne HTTPS: **Variante 0 (.mcpb)** oder **Variante A (Config-Datei)** nutzen.
 
 ---
 
@@ -158,3 +156,28 @@ Wenn Claude die Meldung **„Server disconnected“** oder **„Server transport
    In den Entwickler-Logs von Claude solltest du u. a. sehen:  
    `[Symcon MCPB] Connecting to Symcon MCP server at http://127.0.0.1:4096 …`  
    Erscheint danach `Adapter exited with code …`, ist der Symcon MCP-Server unter dieser URL nicht erreichbar (nicht gestartet oder falsche URL).
+
+---
+
+## 6. Optional: Symcon MCP-Server per HTTPS starten
+
+Wenn du **„Benutzerdefinierten Connector hinzufügen“** in Claude nutzen willst, muss die URL mit **https** beginnen. Dafür kannst du den Symcon MCP-Server mit HTTPS starten (self-signed Zertifikat für localhost).
+
+1. **Self-signed Zertifikat erzeugen** (einmalig):
+   ```bash
+   mkdir -p symcon-mcp-server/libs/mcp-server/certs
+   cd symcon-mcp-server/libs/mcp-server/certs
+   openssl req -x509 -newkey rsa:2048 -keyout server.key -out server.crt -days 365 -nodes -subj "/CN=localhost"
+   ```
+
+2. **Server mit HTTPS starten:**
+   ```bash
+   cd symcon-mcp-server
+   export MCP_HTTPS=1
+   ./start-mcp-local.sh
+   ```
+   Der Server meldet dann z. B. `listening on https://0.0.0.0:4096`.
+
+3. **In Claude:** Unter Konnektoren → Benutzerdefinierten Connector hinzufügen → URL: **https://127.0.0.1:4096**. (Self-signed: Claude/Browser kann eine Sicherheitswarnung anzeigen – für localhost in der Regel akzeptierbar.)
+
+**Hinweis:** Die **.mcpb-Erweiterung** und die **Config-Datei** funktionieren weiterhin mit **http** – HTTPS ist nur nötig, wenn du explizit die Connector-URL in Claude eintragen willst.

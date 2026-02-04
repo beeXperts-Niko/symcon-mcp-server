@@ -1,9 +1,13 @@
 /**
- * Symcon MCP Server – Streamable HTTP entry point.
+ * Symcon MCP Server – Streamable HTTP/HTTPS entry point.
  * Reads MCP_PORT, SYMCON_API_URL, MCP_AUTH_TOKEN from environment (set by Symcon module).
+ * Optional HTTPS: MCP_HTTPS=1, MCP_TLS_CERT und MCP_TLS_KEY (Pfade zu PEM-Dateien).
  */
 
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -17,8 +21,12 @@ const SYMCON_API_USER = process.env.SYMCON_API_USER ?? '';
 const SYMCON_API_PASSWORD = process.env.SYMCON_API_PASSWORD ?? '';
 /** Optional: if set, requests must send Authorization: Bearer <token> or X-MCP-API-Key: <token> */
 const MCP_AUTH_TOKEN = process.env.MCP_AUTH_TOKEN ?? '';
-/** Bind on all interfaces (0.0.0.0) so the server is reachable at http://<SymBox-IP>:PORT from your Mac/PC. */
+/** Bind on all interfaces (0.0.0.0) so the server is reachable at http(s)://<SymBox-IP>:PORT from your Mac/PC. */
 const HOST = process.env.MCP_BIND ?? '0.0.0.0';
+/** Optional HTTPS: MCP_HTTPS=1 und MCP_TLS_CERT / MCP_TLS_KEY (Pfade zu PEM), oder Zertifikate in ./certs/server.crt und ./certs/server.key */
+const USE_HTTPS = process.env.MCP_HTTPS === '1' || process.env.MCP_HTTPS === 'true';
+const TLS_CERT_PATH = process.env.MCP_TLS_CERT ?? join(process.cwd(), 'certs', 'server.crt');
+const TLS_KEY_PATH = process.env.MCP_TLS_KEY ?? join(process.cwd(), 'certs', 'server.key');
 
 function constantTimeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a, 'utf8');
@@ -92,15 +100,17 @@ async function main(): Promise<void> {
   });
   await mcp.connect(transport);
 
-  const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    // Auth nur für POST (JSON-RPC). GET (SSE-Stream) oft ohne Header – sonst hängen manche MCP-Clients bei "Loading Tools".
+  const requestHandler = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     if (req.method === 'POST' && !isAuthorized(req)) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Unauthorized', message: 'Missing or invalid API key' }));
       return;
     }
+    const allowedOrigins = [
+      `http://127.0.0.1:${PORT}`, `http://localhost:${PORT}`,
+      `https://127.0.0.1:${PORT}`, `https://localhost:${PORT}`,
+    ];
     const origin = req.headers.origin;
-    const allowedOrigins = [`http://127.0.0.1:${PORT}`, `http://localhost:${PORT}`];
     if (origin && !allowedOrigins.includes(origin) && HOST === '127.0.0.1') {
       res.writeHead(403, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Origin not allowed' }));
@@ -108,10 +118,33 @@ async function main(): Promise<void> {
     }
     const body = req.method === 'POST' ? await readBody(req) : undefined;
     await transport.handleRequest(req, res, body);
-  });
+  };
 
+  let server: import('node:http').Server | import('node:https').Server;
+  if (USE_HTTPS) {
+    if (!existsSync(TLS_CERT_PATH) || !existsSync(TLS_KEY_PATH)) {
+      process.stderr.write(
+        `HTTPS requested (MCP_HTTPS=1) but cert/key not found. Set MCP_TLS_CERT and MCP_TLS_KEY, or place server.crt and server.key in ./certs/\n` +
+        `  Example (self-signed): openssl req -x509 -newkey rsa:2048 -keyout certs/server.key -out certs/server.crt -days 365 -nodes -subj /CN=localhost\n`
+      );
+      process.exit(1);
+    }
+    server = createHttpsServer(
+      {
+        cert: readFileSync(TLS_CERT_PATH),
+        key: readFileSync(TLS_KEY_PATH),
+      },
+      requestHandler
+    );
+  } else {
+    server = createHttpServer(requestHandler);
+  }
+
+  const scheme = USE_HTTPS ? 'https' : 'http';
   server.listen(PORT, HOST, () => {
-    process.stderr.write(`Symcon MCP Server listening on port ${PORT} (${HOST === '0.0.0.0' ? 'all interfaces, use http://<SymBox-IP>:' + PORT : HOST + ':' + PORT})\n`);
+    process.stderr.write(
+      `Symcon MCP Server listening on ${scheme}://${HOST === '0.0.0.0' ? '0.0.0.0' : HOST}:${PORT} (${HOST === '0.0.0.0' ? 'use ' + scheme + '://<SymBox-IP>:' + PORT : ''})\n`
+    );
     process.stderr.write(`Symcon API: ${SYMCON_API_URL}\n`);
     if (MCP_AUTH_TOKEN) process.stderr.write('Auth: API key required (Authorization: Bearer or X-MCP-API-Key)\n');
   });

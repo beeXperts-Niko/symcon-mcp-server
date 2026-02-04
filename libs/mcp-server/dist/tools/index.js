@@ -1,7 +1,9 @@
 /**
  * MCP tool handlers for Symcon API.
  * Each tool maps to Symcon Befehlsreferenz methods.
+ * Wissensbasis-Tools nutzen KnowledgeStore für gelernte Geräte-Zuordnungen.
  */
+import { getKnowledgeStore } from '../knowledge/KnowledgeStore.js';
 import { z } from 'zod';
 const variableIdSchema = z.object({ variableId: z.number().int().positive() });
 const objectIdSchema = z.object({ objectId: z.number().int().positive() });
@@ -227,6 +229,85 @@ export function createToolHandlers(client) {
                         },
                     ],
                 };
+            },
+        },
+        symcon_knowledge_get: {
+            description: 'Liefert alle gelernten Geräte-Zuordnungen (Wissensbasis). Die KI nutzt das, um „Büro Licht“ etc. auf VariableIDs aufzulösen, oder um dem User Vorschläge zu machen.',
+            inputSchema: z.object({}),
+            handler: async (_args) => {
+                const store = getKnowledgeStore();
+                const mappings = await store.getMappings();
+                return { content: [{ type: 'text', text: JSON.stringify({ deviceMappings: mappings }, null, 2) }] };
+            },
+        },
+        symcon_knowledge_set: {
+            description: 'Speichert eine Geräte-Zuordnung in der Wissensbasis (Lernen). Nach User-Bestätigung aufrufen, z. B. „Ja, das ist mein Bürolicht.“ → userLabel „Büro Licht“, variableId, variableName „Zustand“, optional path.',
+            inputSchema: z.object({
+                userLabel: z.string().describe('Nutzer-Label, z. B. "Büro Licht", "Bürolicht"'),
+                variableId: z.number().int().positive(),
+                variableName: z.string().describe('Name der Variable in Symcon, z. B. "Zustand"'),
+                path: z.string().optional().describe('Optional: Pfad im Objektbaum, z. B. Räume/Erdgeschoss/Büro/EG-BU-LI-1/Zustand'),
+                objectId: z.number().int().positive().optional(),
+            }),
+            handler: async (args) => {
+                const { userLabel, variableId, variableName, path, objectId } = getArgs(args);
+                const store = getKnowledgeStore();
+                const entry = await store.addOrUpdateMapping({ userLabel, variableId, variableName, path, objectId });
+                return { content: [{ type: 'text', text: JSON.stringify({ ok: true, learned: entry }) }] };
+            },
+        },
+        symcon_resolve_device: {
+            description: 'Löst eine Nutzer-Phrase (z. B. "Büro Licht", "Licht im Büro") in der Wissensbasis auf. Wenn gefunden: variableId und variableName zurückgeben, dann kann die KI SetValue/RequestAction ausführen.',
+            inputSchema: z.object({
+                userPhrase: z.string().describe('Was der User gesagt hat, z. B. "Büro Licht", "Licht im Büro"'),
+            }),
+            handler: async (args) => {
+                const { userPhrase } = getArgs(args);
+                const store = getKnowledgeStore();
+                const mapping = await store.resolve(userPhrase);
+                if (!mapping) {
+                    return { content: [{ type: 'text', text: JSON.stringify({ found: false, hint: 'Noch nicht gelernt. KI soll Objektbaum erkunden und User fragen, dann symcon_knowledge_set aufrufen.' }) }] };
+                }
+                return { content: [{ type: 'text', text: JSON.stringify({ found: true, variableId: mapping.variableId, variableName: mapping.variableName, userLabel: mapping.userLabel }) }] };
+            },
+        },
+        symcon_get_variable_by_path: {
+            description: 'Ermittelt die VariableID anhand eines Pfads im Objektbaum (z. B. Räume/Erdgeschoss/Büro/EG-BU-LI-1/Zustand). Nützlich zum Lernen: KI findet Pfad, holt variableId, fragt User, speichert mit symcon_knowledge_set.',
+            inputSchema: z.object({
+                path: z.string().describe('Pfad mit / getrennt, z. B. Räume/Erdgeschoss/Büro/EG-BU-LI-1/Zustand'),
+            }),
+            handler: async (args) => {
+                const { path: pathStr } = getArgs(args);
+                const segments = pathStr.split('/').map((s) => s.trim()).filter(Boolean);
+                if (segments.length === 0) {
+                    return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: 'Pfad leer' }) }] };
+                }
+                let parentId = 0;
+                let objectId = 0;
+                for (let i = 0; i < segments.length; i++) {
+                    const name = segments[i];
+                    const childIds = await client.getChildrenIds(parentId);
+                    let found = false;
+                    for (const id of childIds) {
+                        const obj = (await client.getObject(id));
+                        const objName = String(obj?.Name ?? '').trim();
+                        if (objName === name || objName.toLowerCase() === name.toLowerCase()) {
+                            parentId = id;
+                            objectId = id;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: `Segment "${name}" nicht gefunden unter Parent ${parentId}`, segmentIndex: i }) }] };
+                    }
+                }
+                const obj = (await client.getObject(objectId));
+                const type = Number(obj?.ObjectType ?? -1);
+                if (type !== 2) {
+                    return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: `Letztes Objekt (${objectId}) ist keine Variable (ObjectType ${type}, erwartet 2)` }) }] };
+                }
+                return { content: [{ type: 'text', text: JSON.stringify({ ok: true, variableId: objectId, variableName: segments[segments.length - 1], path: pathStr }) }] };
             },
         },
     };

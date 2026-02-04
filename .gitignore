@@ -21,6 +21,10 @@ local-config.env
 !libs/mcp-server/dist/**
 # Wissensbasis (gelernte Geräte-Zuordnungen) – pro Nutzer/Instanz, nicht committen
 libs/mcp-server/data/
+# Lokale TLS-Zertifikate (HTTPS, self-signed)
+libs/mcp-server/certs/*.crt
+libs/mcp-server/certs/*.key
+libs/mcp-server/certs/*.pem
 **/.cache/
 
 # IDEs

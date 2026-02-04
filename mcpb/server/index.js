@@ -8,6 +8,7 @@
 
 const { spawn } = require('child_process');
 const http = require('http');
+const https = require('https');
 
 const adapter = '@pyroprompts/mcp-stdio-to-streamable-http-adapter';
 const uri = (process.env.URI || 'http://127.0.0.1:4096').trim();
@@ -21,27 +22,26 @@ if (bearerToken) {
   delete env.BEARER_TOKEN;
 }
 
-/** Prüft, ob unter URI ein Server antwortet (z. B. Symcon MCP). Bei ECONNREFUSED → false. */
+/** Prüft, ob unter URI ein Server antwortet (z. B. Symcon MCP). Bei ECONNREFUSED → false. HTTPS: self-signed erlaubt (rejectUnauthorized: false). */
 function checkReachable(url, timeoutMs) {
   return new Promise((resolve) => {
     try {
       const u = new URL(url);
+      const port = u.port || (u.protocol === 'https:' ? 443 : 80);
+      const opts = {
+        hostname: u.hostname,
+        port,
+        path: u.pathname || '/',
+        method: 'GET',
+      };
       if (u.protocol === 'https:') {
-        resolve(false);
-        return;
+        opts.rejectUnauthorized = false;
       }
-      const req = http.request(
-        {
-          hostname: u.hostname,
-          port: u.port || 80,
-          path: u.pathname || '/',
-          method: 'GET',
-        },
-        (res) => {
-          res.on('data', () => {});
-          res.on('end', () => resolve(true));
-        }
-      );
+      const lib = u.protocol === 'https:' ? https : http;
+      const req = lib.request(opts, (res) => {
+        res.on('data', () => {});
+        res.on('end', () => resolve(true));
+      });
       req.setTimeout(timeoutMs, () => {
         req.destroy();
         resolve(false);

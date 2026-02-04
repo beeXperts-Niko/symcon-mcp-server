@@ -60,8 +60,16 @@ if [ -n "$SYMCON_USER" ] && [ -n "$SYMCON_PASS" ]; then
   echo "Symcon-Anmeldung OK."
 fi
 
+# Optional HTTPS: wenn certs vorhanden, MCP_HTTPS=1 setzen (für Claude „Benutzerdefinierten Connector“ mit https://)
+if [ -f "$MCP_DIR/certs/server.crt" ] && [ -f "$MCP_DIR/certs/server.key" ]; then
+  export MCP_HTTPS=1
+  export MCP_TLS_CERT="$MCP_DIR/certs/server.crt"
+  export MCP_TLS_KEY="$MCP_DIR/certs/server.key"
+  echo "HTTPS: Zertifikate gefunden, Server startet mit https://"
+fi
+
 echo "Starte MCP-Server lokal (Port 4096), Symcon-API: $SYMCON_URL"
-echo "In Cursor MCP-URL auf http://127.0.0.1:4096 stellen, dann Cursor neu starten."
+echo "In Cursor MCP-URL auf http(s)://127.0.0.1:4096 stellen, dann Cursor neu starten."
 if [ -n "$SYMCON_USER" ]; then
   echo "Symcon-Auth: Basic-Auth aktiv (Remote Access)."
 fi
