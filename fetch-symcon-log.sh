@@ -5,12 +5,12 @@
 #   ./fetch-symcon-log.sh [USER@]HOST [ZEILEN]
 #
 # Beispiele:
-#   ./fetch-symcon-log.sh root@192.168.10.12
+#   ./fetch-symcon-log.sh root@<SymBox-IP>
 #   ./fetch-symcon-log.sh root@symbox.fritz.box 200
-#   ./fetch-symcon-log.sh root@192.168.10.12 500 | grep -i mcp
+#   ./fetch-symcon-log.sh root@<SymBox-IP> 500 | grep -i mcp
 
 set -e
-HOST="${1:-root@192.168.10.12}"
+HOST="${1:?Usage: $0 root@<SymBox-IP> [lines]  – Ihre SymBox-IP z. B. in local-config.env, nicht im Repo.}"
 LINES="${2:-100}"
 
 # Symcon-Datenverzeichnis: SymBox/SymOS variiert (var/lib, mnt/data, opt, …)

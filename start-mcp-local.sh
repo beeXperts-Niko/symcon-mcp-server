@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # MCP-Server lokal auf dem Mac starten (Workaround wenn SymBox:4096 nicht erreichbar).
-# Symcon-API bleibt auf der SymBox (z. B. http://192.168.10.12:3777/api/).
+# Symcon-API bleibt auf der SymBox (URL in local-config.env, z. B. http://<SymBox-IP>:3777/api/).
 #
 # Config: Lizenz-E-Mail und URL in local-config.env (siehe local-config.env.example).
 # Passwort wird beim Start abgefragt, wenn SYMCON_API_USER gesetzt ist.
